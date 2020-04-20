@@ -3,6 +3,7 @@ import logging
 import datetime
 import time
 import typing
+import re
 
 import pymongo
 import discord
@@ -16,7 +17,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 #activityStatus = discord.Activity(type=discord.ActivityType.playing, name='DM to contact mods')
-bot = commands.Bot(['!', ',', '.'], fetch_offline_members=True)#, activity=activityStatus, case_insensitive=True)
+bot = commands.Bot(['!', ',', '.', 'p'], fetch_offline_members=True)#, activity=activityStatus, case_insensitive=True)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -192,28 +193,93 @@ class Mail(commands.Cog):
         embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)
 
+    @commands.has_any_role(config.modRole)
+    @commands.command(name='reply', aliases=['r'])
+    async def _reply(self, ctx, *, content):
+        db = mclient.modmail.logs
+        doc = db.find_one({'channel_id': str(ctx.channel.id)})
+
+        if ctx.channel.category_id != config.category or not doc: # No thread in channel, or not in modmail category
+            return await ctx.send('Cannot send a reply here, this is not a modmail channel!')
+
+        if len(content) > 1800:
+            return await ctx.send(f'Wow there, thats a big reply. Please reduce it by at least {len(content) - 1800} characters')
+
+        recipient = doc['recipient']['id']
+        attachments = [x.url for x in ctx.message.attachments]
+        member = ctx.guild.get_member(recipient)
+        if not member:
+            try:
+                member = await ctx.guild.fetch_member(recipient)
+
+            except:
+                return await ctx.send('There was an getting that member')
+
+        try:
+            await member.send(f'Reply from **{ctx.author}**. You can respond by replying to this message\n--------\n{content}')
+            if attachments:
+                await member.send('\n'.join(attachments))
+
+        except:
+            return await ctx.send('There was an issue sending that message to the user')
+
+        db.update_one({'_id': doc['_id']}, {'$push': {'messages': {
+            'timestamp': str(ctx.message.created_at),
+            'message_id': str(ctx.message.id),
+            'content': content,
+            'type': 'thread_message',
+            'author': {
+                'id': str(ctx.author.id),
+                'name': ctx.author.name,
+                'discriminator': ctx.author.discriminator,
+                'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
+                'mod': True
+            },
+            'attachments': attachments
+        }}})
+
+        embed = discord.Embed(title='Moderator message', description=content, color=0x7ED321)
+        embed.set_author(name=str(ctx.author), icon_url=ctx.author.avatar_url)
+        await ctx.send(embed=embed)
+
     @commands.Cog.listener()
     async def on_ready(self):
         logging.info('[Bot] Ready')
         if not self.READY:
             self.READY = True
+            self.bot.remove_command('help')
+
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.errors.CommandNotFound):
+            pass # Ignore
+
+        else:
+            raise error
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.id not in [125233822760566784]: return
+        if message.author.bot: return
+        attachments = [x.url for x in message.attachments]
+
         # Do something to check category, and add message to log
         if message.channel.type == discord.ChannelType.private:
             # User has sent a DM -- check 
             db = mclient.modmail.logs
             thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
-            attachments = [x.url for x in message.attachments]
             if thread:
                 description = message.content if message.content else None
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
                 embed.set_author(name=str(message.author), icon_url=message.author.avatar_url)
-                if attachments:
+                if len(attachments) > 1: # More than one attachment, use fields
                     for x in range(len(attachments)):
-                        embed.add_field(name=f'Attachment {x}', value=attachments[x])
+                        embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
+
+                elif attachments and re.search(r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE): # One attachment, image
+                    embed.set_image(url=attachments[0])
+
+                elif attachments: # Still have an attachment, but not an image
+                    embed.add_field(name=f'Attachment', value=attachments[0])
 
                 await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(embed=embed)
                 db.update_one({'_id': thread['_id']}, {'$push': {'messages': {
@@ -239,47 +305,63 @@ class Mail(commands.Cog):
                 embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
                 embed.set_author(name=str(message.author), icon_url=message.author.avatar_url)
 
+                threadCount = db.find({'recipient.id': str(message.author.id)}).count()
                 docID = await self._create_thread(channel, message, message.author, message.author)
 
                 punsDB = mclient.bowser.puns
                 puns = punsDB.find({'user': message.author.id, 'active': True})
-                description = f"A new modmail needs to be reviewed from {message.author.mention}. There are {db.find({'recipient.id': str(message.author.id)}).count()} previous threads involving this user. Archive link: {config.logUrl}{docID}"
+                description = f"A new modmail needs to be reviewed from {message.author.mention}. There are {threadCount} previous threads involving this user. Archive link: {config.logUrl}{docID}"
 
                 if puns.count():
-                    punNames = {
-                        'tier1': 'T1 Warn',
-                        'tier2': 'T2 Warn',
-                        'tier3': 'T3 Warn',
-                        'clear': 'Warn Clear',
-                        'mute': 'Mute',
-                        'unmute': 'Unmute',
-                        'kick': 'Kick',
-                        'ban': 'Ban',
-                        'unban': 'Unban',
-                        'blacklist': 'Blacklist ({})',
-                        'unblacklist': 'Unblacklist ({})',
-                        'note': 'User note'
-                    }
                     description += '\n\n__User has active punishments:__\n'
                     for pun in puns:
                         timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
-                        description += f"**{punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+                        description += f"**{self.punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
                 embed.description = description
                 mailMsg = await channel.send(embed=embed)
                 await self._info(await self.bot.get_context(mailMsg), await guild.fetch_member(message.author.id))
 
-                print('test')
                 embed = discord.Embed(title='New message', description=message.content if message.content else None, color=0x32B6CE)
                 embed.set_author(name=str(message.author), icon_url=message.author.avatar_url)
-                if attachments:
+                if len(attachments) > 1: # More than one attachment, use fields
                     for x in range(len(attachments)):
-                        embed.add_field(name=f'Attachment {x}', value=attachments[x])
+                        embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
+
+                elif attachments and re.search(r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE): # One attachment, image
+                    embed.set_image(url=attachments[0])
+
+                elif attachments: # Still have an attachment, but not an image
+                    embed.add_field(name=f'Attachment', value=attachments[0])
 
                 await channel.send(embed=embed)
+                await message.channel.send(f'Hi there!\nYou have opened a modmail thread with the chat moderators who oversee the **{guild.name}** Discord and they have received your message.\n\nI will send you a message when moderators respond to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅. \n\nPlease be patient for a response; if this is an urgent issue you may also ping the Chat-Mods with @Chat-Mods in a channel')
 
+            await message.add_reaction('✅')
 
-        #await commands.process_commands(message)
+        elif message.channel.category_id == config.category:
+            db = mclient.modmail.logs
+            doc = db.find_one({'channel_id': str(message.channel.id)})
+            if doc:
+                ctx = await self.bot.get_context(message)
+                if not ctx.valid: # Not an invoked command, mark as internal message
+                    db.update_one({'_id': doc['_id']}, {'$push': {'messages': {
+                        'timestamp': str(message.created_at),
+                        'message_id': str(message.id),
+                        'content': message.content,
+                        'type': 'internal',
+                        'author': {
+                            'id': str(message.author.id),
+                            'name': message.author.name,
+                            'discriminator': message.author.discriminator,
+                            'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                            'mod': True
+                        },
+                        'attachments': attachments
+                    }}})
+
+        if await self.bot.get_context(message).valid:
+            await self.bot.process_commands(message)
 
 bot.add_cog(Mail(bot))
 bot.load_extension('jishaku')
