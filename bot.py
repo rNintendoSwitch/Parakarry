@@ -17,7 +17,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='DM to contact mods')
-bot = commands.Bot(['!', ',', '.', 'p'], fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
+bot = commands.Bot(['!', ',', 'p'], fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -41,10 +41,10 @@ class Mail(commands.Cog):
             'note': 'User note'
         }
         self.closeQueue = {}
-        self._close_queue.start()
+        self._close_queue.start() #pylint: disable=no-member
 
     def cog_unload(self, bot):
-        self._close_queue.stop()
+        self._close_queue.stop() #pylint: disable=no-member
 
     def resolve_duration(self, data):
         '''
@@ -279,38 +279,11 @@ class Mail(commands.Cog):
 
     @tasks.loop(seconds=10)
     async def _close_queue(self):
-        db = mclient.modmail.logs
-        closeKeys = []
-        for key, value in self.closeQueue.items():
-            if value['date'] <= datetime.datetime.utcnow():
-                db.update_one({'_id': key}, {
-                    '$set': {
-                        'open': False,
-                        'closed_at': str(value['message'].created_at),
-                        'closer': {
-                            'id': str(value['message'].author.id),
-                            'name': value['message'].author.name,
-                            'discriminator': value['message'].author.discriminator,
-                            'avatar_url': str(value['message'].author.avatar_url_as(static_format='png', size=1024)),
-                            'mod': True
-                        }
-                    }
-                })
-                await value['message'].channel.delete(reason=f'Modmail closed by {value["mod"]}')
-                closeKeys.append(key)
-
-                user = value['user']
-                mod = value['mod']
-
-                await value['message'].guild.get_member(int(value['user']['id'])).send('__Your modmail thread has been closed__. If you need to contact the chat-moderators again you may send a message to open another modmail thread')
-
-                embed = discord.Embed(description=config.logUrl + key, color=0xB8E986, timestamp=datetime.datetime.utcnow())
-                embed.set_author(name=f'Mod mail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
-                embed.add_field(name='User', value=f'<@{user["id"]}>', inline=True)
-                embed.add_field(name='Moderator', value=f'{mod}', inline=True)
-                await self.modLogs.send(embed=embed)
-
-        for x in closeKeys: del self.closeQueue[x]
+        queue = self.closeQueue.copy()
+        for key, value in queue.items():
+            if value['date'] < datetime.datetime.utcnow():
+                await self._close.__call__(value['ctx'], delay=None) #pylint: disable=not-callable
+                del self.closeQueue[key]
 
     @commands.has_any_role(config.modRole)
     @commands.command(name='close')
@@ -328,8 +301,8 @@ class Mail(commands.Cog):
             except KeyError:
                 return await ctx.send('Invalid duration')
 
-            self.closeQueue[doc['_id']] = {'date': delayDate, 'message': ctx.message, 'user': doc['recipient'], 'mod': ctx.author}
-            return await ctx.send('Thread scheduled to be closed. Will be deleted in ' + self.humanize_duration(delayDate))
+            self.closeQueue[doc['_id']] = {'ctx': ctx, 'date': delayDate}
+            return await ctx.send('Thread scheduled to be closed. Will be closed in ' + self.humanize_duration(delayDate))
 
         db.update_one({'_id': doc['_id']}, {
             '$set': {
