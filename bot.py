@@ -64,6 +64,13 @@ class Mail(commands.Cog):
         value = 0
         digits = ''
 
+        try:
+            int(data)
+            raise KeyError('No time units provided')
+
+        except ValueError:
+            pass
+
         for char in data:
             if char.isdigit():
                 digits += char
