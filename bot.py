@@ -194,7 +194,7 @@ class Mail(commands.Cog):
 
         # Member object, loads of info to work with
         messages = mclient.bowser.messages.find({'author': user.id})
-        msgCount = 0 if not messages else messages.count()
+        msgCount = 0 if not messages else mclient.bowser.messages.count_documents({'author': user.id})
 
         desc = f'Fetched user {user.mention}' if inServer else f'Fetched information about previous member {user.mention} ' \
             'from the API because they are not in this server. ' \
@@ -241,8 +241,8 @@ class Mail(commands.Cog):
         embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
 
         noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
-        if noteDocs.count():
-            noteCnt = noteDocs.count()
+        noteCnt = mclient.bowser.puns.count_documents({'user': user.id, 'type': 'note'})
+        if noteCnt:
             noteList = []
             for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
                 stamp = datetime.datetime.utcfromtimestamp(x['timestamp']).strftime('`[%m/%d/%y]`')
@@ -252,7 +252,8 @@ class Mail(commands.Cog):
 
         punishments = ''
         punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}})
-        if not punsCol.count():
+        punsCnt = mclient.bowser.puns.count_documents({'user': user.id, 'type': {'$ne': 'note'}})
+        if not punsCnt:
             punishments = '__*No punishments on record*__'
 
         else:
@@ -270,7 +271,7 @@ class Mail(commands.Cog):
                 else:
                     punishments += f'+ [{stamp}] {punType}\n'
 
-            punishments = f'Showing {puns}/{punsCol.count()} punishment entries. ' \
+            punishments = f'Showing {puns}/{punsCnt} punishment entries. ' \
                 f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
                 f'\n```diff\n{punishments}```'
         embed.add_field(name='Punishments', value=punishments, inline=False)
@@ -514,14 +515,15 @@ class Mail(commands.Cog):
                 embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
 
-                threadCount = db.find({'recipient.id': str(message.author.id)}).count()
+                threadCount = db.count_documents({'recipient.id': str(message.author.id)})
                 docID = await self._create_thread(channel, message, message.author, message.author)
 
                 punsDB = mclient.bowser.puns
                 puns = punsDB.find({'user': message.author.id, 'active': True})
+                punsCnt = punsDB.count_documents({'user': message.author.id, 'active': True})
                 description = f"A new modmail needs to be reviewed from {message.author.mention}. There are {threadCount} previous threads involving this user. Archive link: {config.logUrl}{docID}"
 
-                if puns.count():
+                if punsCnt:
                     description += '\n\n__User has active punishments:__\n'
                     for pun in puns:
                         timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
