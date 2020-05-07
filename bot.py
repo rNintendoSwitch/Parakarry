@@ -380,6 +380,10 @@ class Mail(commands.Cog):
         if content and len(content) > 1800:
             return await ctx.send(f'Wow there, thats a big reply. Please reduce it by at least {len(content) - 1800} characters')
 
+        if doc['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
+            del self.closeQueue[doc['_id']]
+            await ctx.channel.send('Thread closure canceled due to moderator response')
+
         recipient = doc['recipient']['id']
         member = ctx.guild.get_member(recipient)
         if not member:
@@ -387,7 +391,7 @@ class Mail(commands.Cog):
                 member = await ctx.guild.fetch_member(recipient)
 
             except:
-                return await ctx.send('There was an getting that member')
+                return await ctx.send('There was an issue replying to this user, they may have left the server')
 
         try:
             await member.send(f'Reply from **{"Moderator" if anonymous else ctx.author}**: {content if content else ""}')
@@ -395,7 +399,7 @@ class Mail(commands.Cog):
                 await member.send('\n'.join(attachments))
 
         except:
-            return await ctx.send('There was an issue sending that message to the user')
+            return await ctx.send('There was an issue replying to this user, they may have left the server or disabled DMs')
 
         db.update_one({'_id': doc['_id']}, {'$push': {'messages': {
             'timestamp': str(ctx.message.created_at),
