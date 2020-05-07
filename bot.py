@@ -346,7 +346,13 @@ class Mail(commands.Cog):
         })
 
         await ctx.channel.delete(reason=f'Modmail closed by {ctx.author}')
-        await ctx.guild.get_member(int(doc['recipient']['id'])).send('__Your modmail thread has been closed__. If you need to contact the chat-moderators again you may send a message to open another modmail thread')
+        try:
+            mailer = await ctx.guild.fetch_member(int(doc['recipient']['id']))
+            await mailer.send('__Your modmail thread has been closed__. If you need to contact the chat-moderators again you may send me another DM to open a new modmail thread')
+
+        except (discord.HTTPException, discord.Forbidden, discord.NotFound):
+            await self.bot.get_channel(config.adminChannel).send(f'Failed to send DM to <@{doc["recipient"]["id"]}> for modmail closure. They have not been notified')
+
 
         user = doc['recipient']
 
