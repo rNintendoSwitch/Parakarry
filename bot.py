@@ -137,7 +137,7 @@ class Mail(commands.Cog):
             'closed_at': None,
             'channel_id': str(channel.id),
             'guild_id': str(channel.guild.id),
-            'bot_id': self.bot.user.id,
+            'bot_id': str(self.bot.user.id),
             'recipient': {
                 'id': str(recipient.id),
                 'name': recipient.name,
