@@ -566,8 +566,7 @@ class Mail(commands.Cog):
                         'attachments': attachments
                     }}})
 
-        # elif message.content.startswith(f'<@!{self.bot.user.id}>') and message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
-        elif message.content.startswith(f'<@!{self.bot.user.id}>') and message.channel.type == discord.ChannelType.text:
+        elif message.content.startswith(f'<@!{self.bot.user.id}>') and message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
             db = mclient.modmail.logs
             thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
 
