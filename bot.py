@@ -566,53 +566,55 @@ class Mail(commands.Cog):
                         'attachments': attachments
                     }}})
 
-        elif message.content.startswith(f'<@!{self.bot.user.id}> ') and message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
+        # elif message.content.startswith(f'<@!{self.bot.user.id}>') and message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
+        elif message.content.startswith(f'<@!{self.bot.user.id}>') and message.channel.type == discord.ChannelType.text:
             db = mclient.modmail.logs
             thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
 
-            content = message.content[len(f'<@!{self.bot.user.id}> '):]
-            await message.delete()
+            content = message.content[len(f'<@!{self.bot.user.id}>'):].strip()
+            if content:
+                await message.delete()
 
-            embed = discord.Embed(title='New modmail mention', description=content, color=0x7289DA)
-            embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
-            embed.add_field(name=f'Mentioned in', value=f'<#{message.channel.id}> ([Jump to context]({message.jump_url}))')
+                embed = discord.Embed(title='New modmail mention', description=content, color=0x7289DA)
+                embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
+                embed.add_field(name=f'Mentioned in', value=f'<#{message.channel.id}> ([Jump to context]({message.jump_url}))')
 
-            try:
-                dm_embed = discord.Embed(description=content, color=0x7289DA)
-                dm_embed.set_author(name=f'{message.author}', icon_url=message.author.avatar_url)
-                dm_message = await message.author.send(f'You mentioned {self.bot.user.name} in <#{message.channel.id}>', embed=dm_embed)
-                await dm_message.add_reaction('✅') # We don't need to do this but it matches the design language
+                try:
+                    dm_embed = discord.Embed(description=content, color=0x7289DA)
+                    dm_embed.set_author(name=f'{message.author}', icon_url=message.author.avatar_url)
+                    dm_message = await message.author.send(f'You mentioned {self.bot.user.name} in <#{message.channel.id}>', embed=dm_embed)
+                    await dm_message.add_reaction('✅') # We don't need to do this but it matches the design language
 
-            except (discord.HTTPException, discord.Forbidden, discord.NotFound):
-                await self.bot.get_channel(config.adminChannel).send(f'Cannot create thread for mention from <@{message.author.id}> (failed to send DM)', embed=embed)
+                except (discord.HTTPException, discord.Forbidden, discord.NotFound):
+                    await self.bot.get_channel(config.adminChannel).send(f'Cannot create thread for mention from <@{message.author.id}> (failed to send DM)', embed=embed)
 
-            else:
-                if thread: 
-                    channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
-
-                    if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
-                            del self.closeQueue[thread['_id']]
-                            await channel.send('Thread closure canceled due to user response')
-
-                    db.update_one({'_id': thread['_id']}, {'$push': {'messages': { 
-                        'timestamp': str(message.created_at),
-                        'message_id': str(message.id),
-                        'content': message.content,
-                        'type': 'thread_message', # TODO: Different message type in logviewer
-                        'author': {
-                            'id': str(message.author.id),
-                            'name': message.author.name,
-                            'discriminator': message.author.discriminator,
-                            'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
-                            'mod': False
-                        },
-                        'attachments': attachments
-                    }}})
-    
                 else:
-                    channel = await self._user_trigger_create_thread(message.author, message) # TODO: Different message type in logviewer
+                    if thread: 
+                        channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
 
-                await channel.send(embed=embed)
+                        if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
+                                del self.closeQueue[thread['_id']]
+                                await channel.send('Thread closure canceled due to user response')
+
+                        db.update_one({'_id': thread['_id']}, {'$push': {'messages': { 
+                            'timestamp': str(message.created_at),
+                            'message_id': str(message.id),
+                            'content': message.content,
+                            'type': 'thread_message', # TODO: Different message type in logviewer
+                            'author': {
+                                'id': str(message.author.id),
+                                'name': message.author.name,
+                                'discriminator': message.author.discriminator,
+                                'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                                'mod': False
+                            },
+                            'attachments': attachments
+                        }}})
+        
+                    else:
+                        channel = await self._user_trigger_create_thread(message.author, message) # TODO: Different message type in logviewer
+
+                    await channel.send(embed=embed)
 
 bot.add_cog(Mail(bot))
 bot.load_extension('jishaku')
