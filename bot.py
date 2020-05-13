@@ -153,7 +153,7 @@ class Mail(commands.Cog):
                 'mod': False
             },
             'closer': None,
-            'messages': [ 
+            'messages': [
                 {
                     'timestamp': str(message.created_at),
                     'message_id': str(message.id),
