@@ -173,6 +173,43 @@ class Mail(commands.Cog):
 
         return _id
 
+    async def _user_trigger_create_thread(self, member, message):
+        db = mclient.modmail.logs
+        
+        if not mclient.bowser.users.find_one({'_id': member.id})['modmail']: # Modmail restricted, deny thread creation
+            return await member.send('Sorry, I cannot create a new modmail thread because you are currently blacklisted. ' \
+                                            'You may DM a moderator if you still need to contact a Discord staff member. If you have ' \
+                                            'questions or concerns about the blacklist please message the moderator that performed the action.')
+
+        guild = self.bot.get_guild(config.guild)
+        category = guild.get_channel(config.category)
+        channel = await category.create_text_channel(f'{member.name}-{member.discriminator}', reason='New modmail opened')
+
+        embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
+        embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+
+        threadCount = db.count_documents({'recipient.id': str(member.id)})
+        docID = await self._create_thread(channel, message, member, member)
+
+        punsDB = mclient.bowser.puns
+        puns = punsDB.find({'user': member.id, 'active': True})
+        punsCnt = punsDB.count_documents({'user': member.id, 'active': True})
+        description = f"A new modmail needs to be reviewed from {member.mention}. There are {threadCount} previous threads involving this user. Archive link: {config.logUrl}{docID}"
+
+        if punsCnt:
+            description += '\n\n__User has active punishments:__\n'
+            for pun in puns:
+                timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
+                description += f"**{self.punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+
+        embed.description = description
+        mailMsg = await channel.send(embed=embed)
+        await self._info(await self.bot.get_context(mailMsg), await guild.fetch_member(member.id))
+
+        await member.send(f'Hi there!\nYou have opened a modmail thread with the chat moderators who oversee the **{guild.name}** Discord and they have received your message.\n\nI will send you a message when moderators respond to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅. \n\nPlease be patient for a response; if this is an urgent issue you may also ping the Chat-Mods with @Chat-Mods in a channel')
+        
+        return channel
+
     async def _info(self, ctx, user: typing.Union[discord.Member, int]):
         inServer = True
         if type(user) == int:
@@ -491,35 +528,7 @@ class Mail(commands.Cog):
                 }}})
 
             else:
-                if not mclient.bowser.users.find_one({'_id': message.author.id})['modmail']: # Modmail restricted, deny thread creation
-                    return await message.channel.send('Sorry, I cannot create a new modmail thread because you are currently blacklisted. ' \
-                                                    'You may DM a moderator if you still need to contact a Discord staff member. If you have ' \
-                                                    'questions or concerns about the blacklist please message the moderator that performed the action.')
-
-                guild = self.bot.get_guild(config.guild)
-                category = guild.get_channel(config.category)
-                channel = await category.create_text_channel(f'{message.author.name}-{message.author.discriminator}', reason='New modmail opened')
-
-                embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
-                embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
-
-                threadCount = db.count_documents({'recipient.id': str(message.author.id)})
-                docID = await self._create_thread(channel, message, message.author, message.author)
-
-                punsDB = mclient.bowser.puns
-                puns = punsDB.find({'user': message.author.id, 'active': True})
-                punsCnt = punsDB.count_documents({'user': message.author.id, 'active': True})
-                description = f"A new modmail needs to be reviewed from {message.author.mention}. There are {threadCount} previous threads involving this user. Archive link: {config.logUrl}{docID}"
-
-                if punsCnt:
-                    description += '\n\n__User has active punishments:__\n'
-                    for pun in puns:
-                        timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
-                        description += f"**{self.punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
-
-                embed.description = description
-                mailMsg = await channel.send(embed=embed)
-                await self._info(await self.bot.get_context(mailMsg), await guild.fetch_member(message.author.id))
+                thread = await self._user_trigger_create_thread(message.author, message)
 
                 embed = discord.Embed(title='New message', description=message.content if message.content else None, color=0x32B6CE)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
@@ -533,8 +542,7 @@ class Mail(commands.Cog):
                 elif attachments: # Still have an attachment, but not an image
                     embed.add_field(name=f'Attachment', value=attachments[0])
 
-                await channel.send(embed=embed)
-                await message.channel.send(f'Hi there!\nYou have opened a modmail thread with the chat moderators who oversee the **{guild.name}** Discord and they have received your message.\n\nI will send you a message when moderators respond to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅. \n\nPlease be patient for a response; if this is an urgent issue you may also ping the Chat-Mods with @Chat-Mods in a channel')
+                await thread.send(embed=embed)
 
             await message.add_reaction('✅')
 
@@ -557,6 +565,55 @@ class Mail(commands.Cog):
                         },
                         'attachments': attachments
                     }}})
+
+        elif message.content.startswith(f'<@!{self.bot.user.id}>') and message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
+            db = mclient.modmail.logs
+            thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
+
+            content = message.content[len(f'<@!{self.bot.user.id}>'):].strip()
+            if content:
+                await message.delete()
+
+                embed = discord.Embed(title='New modmail mention', description=content, color=0x7289DA)
+                embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
+                embed.add_field(name=f'Mentioned in', value=f'<#{message.channel.id}> ([Jump to context]({message.jump_url}))')
+
+                try:
+                    dm_embed = discord.Embed(description=content, color=0x7289DA)
+                    dm_embed.set_author(name=f'{message.author}', icon_url=message.author.avatar_url)
+                    dm_message = await message.author.send(f'You mentioned {self.bot.user.name} in <#{message.channel.id}>', embed=dm_embed)
+                    await dm_message.add_reaction('✅') # We don't need to do this but it matches the design language
+
+                except (discord.HTTPException, discord.Forbidden, discord.NotFound):
+                    await self.bot.get_channel(config.adminChannel).send(f'Cannot create thread for mention from <@{message.author.id}> (failed to send DM)', embed=embed)
+
+                else:
+                    if thread: 
+                        channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
+
+                        if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
+                                del self.closeQueue[thread['_id']]
+                                await channel.send('Thread closure canceled due to user response')
+
+                        db.update_one({'_id': thread['_id']}, {'$push': {'messages': { 
+                            'timestamp': str(message.created_at),
+                            'message_id': str(message.id),
+                            'content': message.content,
+                            'type': 'thread_message', # TODO: Different message type in logviewer
+                            'author': {
+                                'id': str(message.author.id),
+                                'name': message.author.name,
+                                'discriminator': message.author.discriminator,
+                                'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                                'mod': False
+                            },
+                            'attachments': attachments
+                        }}})
+        
+                    else:
+                        channel = await self._user_trigger_create_thread(message.author, message) # TODO: Different message type in logviewer
+
+                    await channel.send(embed=embed)
 
 bot.add_cog(Mail(bot))
 bot.load_extension('jishaku')
