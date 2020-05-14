@@ -586,6 +586,8 @@ class Mail(commands.Cog):
 
                 except (discord.HTTPException, discord.Forbidden, discord.NotFound):
                     await self.bot.get_channel(config.adminChannel).send(f'Cannot create thread for mention from <@{message.author.id}> (failed to send DM)', embed=embed)
+                    ack = await message.channel.send(f'<@{message.author.id}> You must open your DMs to use modmail threads. Moderators may still receive your mention.')
+                    await ack.delete(delay=30)
 
                 else:
                     if thread: 
