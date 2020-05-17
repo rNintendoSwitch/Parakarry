@@ -124,7 +124,7 @@ class Mail(commands.Cog):
         if not expires: return '0 seconds'
         return ', '.join(expires)
 
-    async def _create_thread(self, channel, message, creator, recipient):
+    async def _create_thread(self, channel, message, creator, recipient, is_mention):
         db = mclient.modmail.logs
         _id = str(message.id) + '-' + str(int(time.time()))
         attachments = [x.url for x in message.attachments]
@@ -158,7 +158,7 @@ class Mail(commands.Cog):
                     'timestamp': str(message.created_at),
                     'message_id': str(message.id),
                     'content': message.content,
-                    'type': 'thread_message',
+                    'type': 'mention' if is_mention else 'thread_message',
                     'author': {
                         'id': str(message.author.id),
                         'name': message.author.name,
@@ -166,14 +166,18 @@ class Mail(commands.Cog):
                         'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
                         'mod': False
                     },
-                    'attachments': attachments
+                    'attachments': attachments,
+                    'channel': {
+                        'id': str(message.channel.id),
+                        'name': message.channel.name
+                    } if is_mention else {}
                 }
             ]
         })
 
         return _id
 
-    async def _user_trigger_create_thread(self, member, message):
+    async def _user_trigger_create_thread(self, member, message, is_mention=False):
         db = mclient.modmail.logs
         
         if not mclient.bowser.users.find_one({'_id': member.id})['modmail']: # Modmail restricted, deny thread creation
@@ -189,7 +193,7 @@ class Mail(commands.Cog):
         embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
 
         threadCount = db.count_documents({'recipient.id': str(member.id)})
-        docID = await self._create_thread(channel, message, member, member)
+        docID = await self._create_thread(channel, message, member, member, is_mention)
 
         punsDB = mclient.bowser.puns
         puns = punsDB.find({'user': member.id, 'active': True})
@@ -601,7 +605,7 @@ class Mail(commands.Cog):
                             'timestamp': str(message.created_at),
                             'message_id': str(message.id),
                             'content': message.content,
-                            'type': 'thread_message', # TODO: Different message type in logviewer
+                            'type': 'mention',
                             'author': {
                                 'id': str(message.author.id),
                                 'name': message.author.name,
@@ -609,11 +613,15 @@ class Mail(commands.Cog):
                                 'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
                                 'mod': False
                             },
-                            'attachments': attachments
+                            'attachments': attachments,
+                            'channel': {
+                                'id': message.channel.id,
+                                'name': message.channel.name
+                            }
                         }}})
         
                     else:
-                        channel = await self._user_trigger_create_thread(message.author, message) # TODO: Different message type in logviewer
+                        channel = await self._user_trigger_create_thread(message.author, message, True)
 
                     await channel.send(embed=embed)
 
