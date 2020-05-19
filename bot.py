@@ -487,6 +487,14 @@ class Mail(commands.Cog):
             raise error
 
     @commands.Cog.listener()
+    async def on_typing(self, channel, user, when):
+        if channel.type == discord.ChannelType.private:
+            db = mclient.modmail.logs
+            doc = db.find_one({'open': True, 'creator.id': str(user.id)})
+            if doc:
+                await self.bot.get_channel(int(doc['channel_id'])).trigger_typing()
+
+    @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot: return
         attachments = [x.url for x in message.attachments]
