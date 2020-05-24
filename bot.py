@@ -578,14 +578,17 @@ class Mail(commands.Cog):
                         'attachments': attachments
                     }}})
 
-        elif message.content.startswith(f'<@!{self.bot.user.id}>') and message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
-            db = mclient.modmail.logs
-            thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
+        elif message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
+            # Regex to match pings with text content after, and none before. Groups: ping id, text content
+            match = re.search(r'^\s*<@!?(\d{15,})>\s+(\S(?:.|\n|\r)+)$', message.content)
 
-            content = message.content[len(f'<@!{self.bot.user.id}>'):].strip()
-            if content:
+            if match and int(match.group(1)) == self.bot.user.id:
                 await message.delete()
 
+                db = mclient.modmail.logs
+                thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
+                content = match.group(2)
+  
                 embed = discord.Embed(title='New modmail mention', description=content, color=0x7289DA)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
                 embed.add_field(name=f'Mentioned in', value=f'<#{message.channel.id}> ([Jump to context]({message.jump_url}))')
