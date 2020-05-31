@@ -182,8 +182,7 @@ class Mail(commands.Cog):
         
         if not mclient.bowser.users.find_one({'_id': member.id})['modmail']: # Modmail restricted, deny thread creation
             return await member.send('Sorry, I cannot create a new modmail thread because you are currently blacklisted. ' \
-                                            'You may DM a moderator if you still need to contact a Discord staff member. If you have ' \
-                                            'questions or concerns about the blacklist please message the moderator that performed the action.')
+                                            'You may DM a moderator if you still need to contact a Discord staff member.')
 
         guild = self.bot.get_guild(config.guild)
         category = guild.get_channel(config.category)
