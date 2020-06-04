@@ -360,7 +360,8 @@ class Mail(commands.Cog):
 
         print('Delete channel')
         try:
-            await ctx.channel.delete(reason=f'Modmail closed by {ctx.author}')
+            channel = self.bot.get_channel(ctx.channel.id)
+            await channel.delete(reason=f'Modmail closed by {ctx.author}')
 
         except discord.NotFound:
             pass
