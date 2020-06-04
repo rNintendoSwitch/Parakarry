@@ -358,7 +358,13 @@ class Mail(commands.Cog):
             }
         })
 
-        await ctx.channel.delete(reason=f'Modmail closed by {ctx.author}')
+        print('Delete channel')
+        try:
+            await ctx.channel.delete(reason=f'Modmail closed by {ctx.author}')
+
+        except discord.NotFound:
+            pass
+
         try:
             mailer = await ctx.guild.fetch_member(int(doc['recipient']['id']))
             await mailer.send('__Your modmail thread has been closed__. If you need to contact the chat-moderators again you may send me another DM to open a new modmail thread')
