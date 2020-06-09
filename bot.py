@@ -312,7 +312,7 @@ class Mail(commands.Cog):
                     punishments += f'+ [{stamp}] {punType}\n'
 
             punishments = f'Showing {puns}/{punsCnt} punishment entries. ' \
-                f'For a full history including responsible moderator, active status, and more use `{ctx.prefix}history @{str(user)}` or `{ctx.prefix}history {user.id}`' \
+                f'For a full history including responsible moderator, active status, and more use `{self.bot.command_prefix[0]}history {user.id}`' \
                 f'\n```diff\n{punishments}```'
         embed.add_field(name='Punishments', value=punishments, inline=False)
         return await ctx.send(embed=embed)
