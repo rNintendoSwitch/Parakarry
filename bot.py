@@ -282,13 +282,20 @@ class Mail(commands.Cog):
 
         noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
         noteCnt = mclient.bowser.puns.count_documents({'user': user.id, 'type': 'note'})
+        fieldValue = 'View history to get full details on all notes.\n\n'
         if noteCnt:
             noteList = []
             for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
                 stamp = datetime.datetime.utcfromtimestamp(x['timestamp']).strftime('`[%m/%d/%y]`')
-                noteList.append(f'{stamp}: {x["reason"]}')
+                noteContent = f'{stamp}: {x["reason"]}'
 
-            embed.add_field(name='User notes', value='View history to get more details on who issued the note.\n\n' + '\n'.join(noteList), inline=False)
+                fieldLength = 0
+                for value in noteList: fieldLength += len(value)
+                if len(noteContent) + fieldLength > 924:
+                    fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes. ' + fieldValue
+                    break
+
+            embed.add_field(name='User notes', value=fieldValue + '\n'.join(noteList), inline=False)
 
         punishments = ''
         punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}})
