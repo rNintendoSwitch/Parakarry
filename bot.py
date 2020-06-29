@@ -298,7 +298,9 @@ class Mail(commands.Cog):
                 if len(noteContent) + fieldLength > 924:
                     fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes. ' + fieldValue
                     break
-
+			
+		noteList.append(noteContent)
+		
             embed.add_field(name='User notes', value=fieldValue + '\n'.join(noteList), inline=False)
 
         punishments = ''
