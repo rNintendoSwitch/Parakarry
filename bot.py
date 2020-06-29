@@ -530,6 +530,8 @@ class Mail(commands.Cog):
                 description = message.content if message.content else None
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
+                embed.set_footer(text=f'{message.channel.id}/{message.id}')
+
                 if len(attachments) > 1: # More than one attachment, use fields
                     for x in range(len(attachments)):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
@@ -559,8 +561,11 @@ class Mail(commands.Cog):
             else:
                 thread = await self._user_trigger_create_thread(message.author, message)
 
+                # TODO: Don't duplicate message embed code based on new thread or just new message
                 embed = discord.Embed(title='New message', description=message.content if message.content else None, color=0x32B6CE)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
+                embed.set_footer(text=f'{message.channel.id}/{message.id}')
+
                 if len(attachments) > 1: # More than one attachment, use fields
                     for x in range(len(attachments)):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
@@ -608,6 +613,7 @@ class Mail(commands.Cog):
   
                 embed = discord.Embed(title='New modmail mention', description=content, color=0x7289DA)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
+                embed.set_footer(text=f'{message.channel.id}/{message.id}')
                 embed.add_field(name=f'Mentioned in', value=f'<#{message.channel.id}> ([Jump to context]({message.jump_url}))')
 
                 try:
