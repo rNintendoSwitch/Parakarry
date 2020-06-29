@@ -298,7 +298,9 @@ class Mail(commands.Cog):
                 if len(noteContent) + fieldLength > 924:
                     fieldValue = f'Only showing {len(noteList)}/{noteCnt} notes. ' + fieldValue
                     break
-
+			
+            noteList.append(noteContent)
+		
             embed.add_field(name='User notes', value=fieldValue + '\n'.join(noteList), inline=False)
 
         punishments = ''
@@ -369,7 +371,6 @@ class Mail(commands.Cog):
             }
         })
 
-        print('Delete channel')
         try:
             channel = self.bot.get_channel(ctx.channel.id)
             await channel.delete(reason=f'Modmail closed by {ctx.author}')
