@@ -254,7 +254,7 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
 
     embed.description = description
     mailMsg = await channel.send(embed=embed)
-    await _info(await bot.get_context(mailMsg), bot, member.id)
+    await _info(await bot.get_context(mailMsg), bot, member.id if banAppeal else await guild.fetch_member(member.id))
 
     if banAppeal:
         await member.send(f'Hi there!\nYou have submitted a ban appeal to the chat moderators who oversee the **{guild.name}** Discord.\n\nI will send you a message when a moderator responds to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅.\n\nPlease be patient for a response; the moderation team will have active discussions about the appeal and may take some time to reply. We ask that you be civil and respectful during this process so constructive conversation can be had in both directions. At the end of this process, moderators will either lift or uphold your ban -- you will receive an official message stating the final decision.')
