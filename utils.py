@@ -196,7 +196,6 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
         closeInfo['$set']['close_message'] = reason
 
     db.update_one({'_id': doc['_id']}, closeInfo)
-
     try:
         channel = bot.get_channel(ctx.channel.id)
         await channel.delete(reason=f'Modmail closed by {ctx.author}')
