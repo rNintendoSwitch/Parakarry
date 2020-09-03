@@ -10,12 +10,13 @@ import pymongo
 import discord
 from discord.ext import commands, tasks
 
+import utils
+
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
 try:
     import config
-    import utils#from modules import utils
 
 except ImportError:
     logging.critical('[Bot] config.py does not exist, you should make one from the example config')
@@ -106,7 +107,7 @@ class Mail(commands.Cog):
         if content and len(content) > 1800:
             return await ctx.send(f'Wow there, thats a big reply. Please reduce it by at least {len(content) - 1800} characters')
 
-        if doc['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response #TODO
+        if doc['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
             self.closeQueue[doc['_id']].cancel()
             await ctx.channel.send('Thread closure canceled due to moderator response')
 
