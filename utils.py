@@ -210,16 +210,23 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
             return await member.send('Sorry, I cannot create a new modmail thread because you are currently blacklisted. ' \
                                             'You may DM a moderator if you still need to contact a Discord staff member.')
     guild = bot.get_guild(config.guild)
+    appealGuild = bot.get_guild(config.appealGuild)
     try:
         await guild.fetch_member(member.id)
 
     except discord.NotFound:
-        # If the user is not in the primary guild
+        # If the user is not in the primary guild. Failsafe check in-case on_member_join didn't catch them
         banAppeal = True
+        try:
+            await guild.fetch_ban(member.id)
+
+        except discord.NotFound:
+            await member.send('You are not banned from /r/NintendoSwitch and have been kicked from the ban appeal server.')
+            await appealGuild.fetch_member(member.id).kick(reason='Member is not banned on /r/NintendoSwitch')
 
     category = guild.get_channel(config.category)
     channelName = f'{member.name}-{member.discriminator}'
-    if banAppeal: channelName = '🔨 | ' + channelName
+    if banAppeal: channelName = '🔨-' + channelName
     channel = await category.create_text_channel(channelName, reason='New modmail opened')
 
     if banAppeal:

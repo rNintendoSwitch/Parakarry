@@ -382,6 +382,21 @@ class Mail(commands.Cog):
 
                     await channel.send(embed=embed)
 
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        if member.guild.id != config.appealGuild: # Return if guild not the appeal server
+            return
+
+        guild = self.bot.get_guild(config.guild)
+        try:
+            await guild.fetch_ban(member.id)
+
+        except discord.NotFound:
+            guildMember = guild.get_member(member.id)
+            if guildMember and guild.get_role(config.modRole) not in guildMember.roles:
+                await member.send('You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned')
+                await member.kick(reason='Not banned on /r/NintendoSwitch')
+
 bot.add_cog(Mail(bot))
 bot.load_extension('jishaku')
 bot.run(config.token)
