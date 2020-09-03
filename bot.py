@@ -214,7 +214,7 @@ class Mail(commands.Cog):
 
     @commands.has_any_role(config.modRole)
     @_appeal.command(name='accept')
-    async def _appeal_accept(self, ctx, reason):
+    async def _appeal_accept(self, ctx, *, reason):
         db = mclient.modmail.logs
         punsDB = mclient.bowser.punsDB
         userDB = mclient.bowser.users
@@ -224,15 +224,18 @@ class Mail(commands.Cog):
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
-        await ctx.guild.unban(user.id)
+        await ctx.guild.unban(user.id, reason=f'Ban appeal accepted by {ctx.author}')
         punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set':{
+            'active': False
+        }})
+        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set':{
             'active': False
         }})
         docID = str(uuid.uuid4())
         while punsDB.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
 
-        docID = db.insert_one({
+        punsDB.insert_one({
             '_id': docID,
             'user': user.id,
             'moderator': ctx.author.id,
@@ -250,15 +253,88 @@ class Mail(commands.Cog):
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
+        await self.modLogs.send(embed=embed)
 
         try:
-            await user.send(f'The moderators have decided to **lift your ban** on the {ctx.guild} Discord. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\n\nIf you are unable to join try reloading your client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.')
+            await user.send(f'The moderators have decided to **lift your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\nIf you are unable to join try reloading your client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.\n\nReason given by moderator:\n```{reason}```')
 
         except:
-            await self.bot.get_channel(config.adminChannel).send(f':warning: The appeal has been accepted, but I was unable to DM {user} informing them of the decision')
+            await self.bot.get_channel(config.adminChannel).send(f':warning: The ban appeal for {user} has been accepted by {ctx.author}, but I was unable to DM them the decision. You may want to apply a tier 3 warning upon return')
 
         else:
-            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The appeal has been accepted for {user}. You may want to apply a tier 3 warning upon return')
+            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author}. You may want to apply a tier 3 warning upon return')
+
+        finally:
+            await utils._close_thread(self.bot, ctx, self.modLogs, dm=False)
+            try:
+                member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
+                await member.kick(reason='Failed appeal')
+
+            except:
+                return
+
+    @commands.has_any_role(config.modRole)
+    @_appeal.command(name='deny')
+    async def _appeal_deny(self, ctx, next_attempt, *, reason):
+        db = mclient.modmail.logs
+        punsDB = mclient.bowser.punsDB
+        userDB = mclient.bowser.users
+
+        doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
+        if not doc:
+            return await ctx.send(':x: This is not a ban appeal channel!')
+
+        try:
+            delayDate = utils.resolve_duration(next_attempt)
+
+        except KeyError:
+            return await ctx.send('Invalid duration')
+
+        docID = str(uuid.uuid4())
+        while punsDB.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
+            docID = str(uuid.uuid4())
+
+        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set':{
+            'active': False
+        }})
+        punsDB.insert_one({
+            '_id': docID,
+            'user': user.id,
+            'moderator': ctx.author.id,
+            'type': 'appealdeny',
+            'timestamp': int(time.time()),
+            'reason': reason,
+            'expiry': int(delayDate.timestamp()),
+            'context': 'appeal',
+            'active': False
+        })
+
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Ban appeal denied | {user}')
+        embed.set_footer(text=doc['_id'])
+        embed.add_field(name='User', value=user.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
+        embed.add_field(name='Reason', value=reason)
+        await self.modLogs.send(embed=embed)
+
+        try:
+            await user.send(f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __{delayDate.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(delayDate)})__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite:{config.appealInvite}\n\nReason given by moderator:\n```{reason}```')
+
+        except:
+            await self.bot.get_channel(config.adminChannel).send(f':warning: The ban appeal for {user} has been denied by {ctx.author}, but I was unable to DM them the decision')
+
+        else:
+            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author}')
+
+        finally:
+            await utils._close_thread(self.bot, ctx, self.modLogs, dm=False)
+            try:
+                member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
+                await member.kick(reason='Failed appeal')
+
+            except:
+                return
 
     @commands.Cog.listener()
     async def on_ready(self):
