@@ -268,7 +268,7 @@ class Mail(commands.Cog):
             await utils._close_thread(self.bot, ctx, self.modLogs, dm=False)
             try:
                 member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
-                await member.kick(reason='Failed appeal')
+                await member.kick(reason='Accepted appeal')
 
             except:
                 return
