@@ -204,6 +204,7 @@ async def _close_thread(bot, ctx, target_channel, dm=True):
 
 async def _trigger_create_thread(bot, member, message, open_type, is_mention=False, moderator=None, content=None, anonymous=True):
     db = mclient.modmail.logs
+    punsDB = mclient.bowser.puns
     banAppeal = False
 
     if open_type == 'user':
@@ -224,6 +225,14 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
         except discord.NotFound:
             await member.send('You are not banned from /r/NintendoSwitch and have been kicked from the ban appeal server.')
             await appealGuild.fetch_member(member.id).kick(reason='Member is not banned on /r/NintendoSwitch')
+
+        else:
+            pun = db.find_one({'type': 'appealdeny', 'active': True})
+            if pun:
+                try:
+                    expiry = datetime.datetime.fromtimestamp(pun['expiry'])
+
+                    await member.send(f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back using the invite from your appeal denial after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {humanize_duration(expiry)})__ to submit a new appeal')
 
     category = guild.get_channel(config.category)
     channelName = f'{member.name}-{member.discriminator}'
