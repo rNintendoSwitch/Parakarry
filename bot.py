@@ -58,8 +58,6 @@ class Mail(commands.Cog):
         if not doc:
             return await ctx.send('This is not a modmail channel!')
 
-        print(self.closeQueue)
-
         if doc['_id'] in self.closeQueue:
             self.closeQueue[doc['_id']].cancel()
 
@@ -71,7 +69,6 @@ class Mail(commands.Cog):
             except KeyError:
                 return await ctx.send('Invalid duration')
 
-            print(str(delayDate.timestamp() - datetime.datetime.utcnow().timestamp()))
             event_loop = self.bot.loop
             close_action = event_loop.call_later(delayTime, event_loop.create_task, utils._close_thread(self.bot, ctx, self.modLogs))
             self.closeQueue[doc['_id']] = close_action
