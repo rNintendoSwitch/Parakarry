@@ -26,7 +26,8 @@ punNames = {
     'unban': 'Unban',
     'blacklist': 'Blacklist',
     'unblacklist': 'Unblacklist',
-    'note': 'User note'
+    'note': 'User note',
+    'appealdeny': 'Denied ban appeal'
 }
 
 def resolve_duration(data):
@@ -238,7 +239,7 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
         # If the user is not in the primary guild. Failsafe check in-case on_member_join didn't catch them
         banAppeal = True
         try:
-            await guild.fetch_ban(member.id)
+            await guild.fetch_ban(member)
 
         except discord.NotFound:
             await member.send('You are not banned from /r/NintendoSwitch and have been kicked from the ban appeal server.')
