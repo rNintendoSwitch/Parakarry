@@ -161,10 +161,10 @@ async def _create_thread(bot, channel, message, creator, recipient, is_mention, 
 
     return _id
 
-async def _close_thread(bot, ctx, target_channel, dm=True):
+async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
     db = mclient.modmail.logs
     doc = db.find_one({'channel_id': str(ctx.channel.id)})
-    db.update_one({'_id': doc['_id']}, {
+    closeInfo = {
         '$set': {
             'open': False,
             'closed_at': str(ctx.message.created_at),
@@ -176,7 +176,11 @@ async def _close_thread(bot, ctx, target_channel, dm=True):
                 'mod': True
             }
         }
-    })
+    }
+    if reason:
+        closeInfo['$set']['close_message'] = reason
+
+    db.update_one({'_id': doc['_id']}, closeInfo)
 
     try:
         channel = bot.get_channel(ctx.channel.id)
