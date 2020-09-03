@@ -161,7 +161,7 @@ async def _create_thread(bot, channel, message, creator, recipient, is_mention, 
 
     return _id
 
-async def _close_thread(bot, ctx, target_channel):
+async def _close_thread(bot, ctx, target_channel, dm=True):
     db = mclient.modmail.logs
     doc = db.find_one({'channel_id': str(ctx.channel.id)})
     db.update_one({'_id': doc['_id']}, {
@@ -185,18 +185,19 @@ async def _close_thread(bot, ctx, target_channel):
     except discord.NotFound:
         pass
 
-    try:
-        mailer = await ctx.guild.fetch_member(int(doc['recipient']['id']))
-        await mailer.send('__Your modmail thread has been closed__. If you need to contact the chat-moderators you may send me another DM to open a new modmail thread')
-
-    except (discord.HTTPException, discord.Forbidden, discord.NotFound):
-        await bot.get_channel(config.adminChannel).send(f'Failed to send DM to <@{doc["recipient"]["id"]}> for modmail closure. They have not been notified')
+    if dm:
+        try:
+            mailer = await ctx.guild.fetch_member(int(doc['recipient']['id']))
+            await mailer.send('__Your modmail thread has been closed__. If you need to contact the chat-moderators you may send me another DM to open a new modmail thread')
+    
+        except (discord.HTTPException, discord.Forbidden, discord.NotFound):
+            await bot.get_channel(config.adminChannel).send(f'Failed to send DM to <@{doc["recipient"]["id"]}> for modmail closure. They have not been notified')
 
 
     user = doc['recipient']
 
     embed = discord.Embed(description=config.logUrl + doc['_id'], color=0xB8E986, timestamp=datetime.datetime.utcnow())
-    embed.set_author(name=f'Mod mail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
+    embed.set_author(name=f'Modmail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
     embed.add_field(name='User', value=f'<@{user["id"]}>', inline=True)
     embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
     await target_channel.send(embed=embed)
