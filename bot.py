@@ -221,7 +221,7 @@ class Mail(commands.Cog):
     @_appeal.command(name='accept')
     async def _appeal_accept(self, ctx, *, reason):
         db = mclient.modmail.logs
-        punsDB = mclient.bowser.punsDB
+        punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
 
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
@@ -229,7 +229,7 @@ class Mail(commands.Cog):
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
-        await ctx.guild.unban(user.id, reason=f'Ban appeal accepted by {ctx.author}')
+        await ctx.guild.unban(user, reason=f'Ban appeal accepted by {ctx.author}')
         punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
@@ -282,7 +282,7 @@ class Mail(commands.Cog):
     @_appeal.command(name='deny')
     async def _appeal_deny(self, ctx, next_attempt, *, reason):
         db = mclient.modmail.logs
-        punsDB = mclient.bowser.punsDB
+        punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
 
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
@@ -312,7 +312,7 @@ class Mail(commands.Cog):
             'reason': reason,
             'expiry': int(delayDate.timestamp()),
             'context': 'banappeal',
-            'active': False
+            'active': True
         })
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
@@ -324,7 +324,7 @@ class Mail(commands.Cog):
         await self.modLogs.send(embed=embed)
 
         try:
-            await user.send(f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __{delayDate.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(delayDate)})__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite:{config.appealInvite}\n\nReason given by moderator:\n```{reason}```')
+            await user.send(f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __{delayDate.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(delayDate)})__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderator:\n```{reason}```')
 
         except:
             await self.bot.get_channel(config.adminChannel).send(f':warning: The ban appeal for {user} has been denied by {ctx.author}, but I was unable to DM them the decision')
@@ -529,7 +529,7 @@ class Mail(commands.Cog):
 
         guild = self.bot.get_guild(config.guild)
         try:
-            await guild.fetch_ban(member.id)
+            await guild.fetch_ban(member)
 
         except discord.NotFound:
             guildMember = guild.get_member(member.id)
