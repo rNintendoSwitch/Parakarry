@@ -218,7 +218,9 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
         banAppeal = True
 
     category = guild.get_channel(config.category)
-    channel = await category.create_text_channel(f'{member.name}-{member.discriminator}', reason='New modmail opened')
+    channelName = f'{member.name}-{member.discriminator}'
+    if banAppeal: channelName = '🔨 | ' + channelName
+    channel = await category.create_text_channel(channelName, reason='New modmail opened')
 
     if banAppeal:
         embed = discord.Embed(title='New ban appeal submitted', color=0xEE5F5F)
