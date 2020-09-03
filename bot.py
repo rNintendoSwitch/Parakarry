@@ -82,11 +82,17 @@ class Mail(commands.Cog):
     @commands.has_any_role(config.modRole)
     @commands.command(name='reply', aliases=['r'])
     async def _reply_user(self, ctx, *, content: typing.Optional[str]):
+        """
+        Reply to an open modmail thread
+        """
         await self._reply(ctx, content)
 
     @commands.has_any_role(config.modRole)
     @commands.command(name='areply', aliases=['ar'])
     async def _reply_anon(self, ctx, *, content: typing.Optional[str]):
+        """
+        Reply to an open modmail thread anonymously
+        """
         await self._reply(ctx, content, True)
 
     async def _reply(self, ctx, content, anonymous=False):
@@ -166,6 +172,9 @@ class Mail(commands.Cog):
     @commands.has_any_role(config.modRole)
     @commands.command(name='open')
     async def _open_thread(self, ctx, member: discord.Member, *, content):
+        """
+        Open a modmail thread with a user
+        """
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
             return await ctx.send(':x: Unable to open modmail to user -- there is already a thread involving them currently open')
 
@@ -175,6 +184,9 @@ class Mail(commands.Cog):
     @commands.has_any_role(config.modRole)
     @commands.command(name='aopen')
     async def _open_thread_anon(self, ctx, member: discord.Member, *, content):
+        """
+        Open a modmail thread with a user anonymously
+        """
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
             return await ctx.send(':x: Unable to open modmail to user -- there is already a thread involving them currently open')
 
