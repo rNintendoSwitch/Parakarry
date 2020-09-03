@@ -243,7 +243,7 @@ class Mail(commands.Cog):
             'timestamp': int(time.time()),
             'reason': '[Ban appeal]' + reason,
             'expiry': None,
-            'context': 'appeal',
+            'context': 'banappeal',
             'active': False
         })
 
@@ -306,7 +306,7 @@ class Mail(commands.Cog):
             'timestamp': int(time.time()),
             'reason': reason,
             'expiry': int(delayDate.timestamp()),
-            'context': 'appeal',
+            'context': 'banappeal',
             'active': False
         })
 
@@ -533,10 +533,13 @@ class Mail(commands.Cog):
         db = mclient.bowser.puns
         pun = db.find_one({'type': 'appealdeny', 'active': True})
         if pun:
-            try:
-                expiry = datetime.datetime.fromtimestamp(pun['expiry'])
+            if pun['expiry'] > datetime.datetime.utcnow().timestamp():
+                try:
+                    expiry = datetime.datetime.fromtimestamp(pun['expiry'])
+                    await member.send(f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back using the invite from your appeal denial after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(expiry)})__ to submit a new appeal')
 
-                await member.send(f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back using the invite from your appeal denial after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(expiry)})__ to submit a new appeal')
+                finally:
+                    await member.kick(reason='Not ready to appeal again')
 
 bot.add_cog(Mail(bot))
 bot.load_extension('jishaku')

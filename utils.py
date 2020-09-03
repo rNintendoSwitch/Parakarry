@@ -229,10 +229,13 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
         else:
             pun = db.find_one({'type': 'appealdeny', 'active': True})
             if pun:
-                try:
-                    expiry = datetime.datetime.fromtimestamp(pun['expiry'])
+                if pun['expiry'] > datetime.datetime.utcnow().timestamp():
+                    try:
+                        expiry = datetime.datetime.fromtimestamp(pun['expiry'])
+                        await member.send(f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back using the invite from your appeal denial after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {humanize_duration(expiry)})__ to submit a new appeal')
 
-                    await member.send(f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back using the invite from your appeal denial after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {humanize_duration(expiry)})__ to submit a new appeal')
+                    finally:
+                        await member.kick(reason='Not ready to appeal again')
 
     category = guild.get_channel(config.category)
     channelName = f'{member.name}-{member.discriminator}'
