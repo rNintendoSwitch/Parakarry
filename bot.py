@@ -4,6 +4,7 @@ import datetime
 import time
 import typing
 import re
+import uuid
 from sys import exit
 
 import pymongo
@@ -204,6 +205,60 @@ class Mail(commands.Cog):
             return await ctx.send(embed=embed)
 
         doc = db.find_one({'_id': args[0]})
+
+    @commands.has_any_role(config.modRole)
+    @commands.group(name='appeal', case_insensitive=True, invoke_without_command=True)
+    async def _appeal(self, ctx):
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
+        await ctx.send(f':x: Incorrect usage. See `{ctx.prefix}help {cmd_str}`')
+
+    @commands.has_any_role(config.modRole)
+    @_appeal.command(name='accept')
+    async def _appeal_accept(self, ctx, reason):
+        db = mclient.modmail.logs
+        punsDB = mclient.bowser.punsDB
+        userDB = mclient.bowser.users
+
+        doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
+        if not doc:
+            return await ctx.send(':x: This is not a ban appeal channel!')
+
+        await ctx.guild.unban(user.id)
+        punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set':{
+            'active': False
+        }})
+        docID = str(uuid.uuid4())
+        while punsDB.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
+            docID = str(uuid.uuid4())
+
+        docID = db.insert_one({
+            '_id': docID,
+            'user': user.id,
+            'moderator': ctx.author.id,
+            'type': 'unban',
+            'timestamp': int(time.time()),
+            'reason': '[Ban appeal]' + reason,
+            'expiry': None,
+            'context': 'appeal',
+            'active': False
+        })
+
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+        embed.set_author(name=f'Ban appeal accepted | {user}')
+        embed.set_footer(text=docID)
+        embed.add_field(name='User', value=user.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
+        embed.add_field(name='Reason', value=reason)
+
+        try:
+            await user.send(f'The moderators have decided to **lift your ban** on the {ctx.guild} Discord. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\n\nIf you are unable to join try reloading your client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.')
+
+        except:
+            await self.bot.get_channel(config.adminChannel).send(f':warning: The appeal has been accepted, but I was unable to DM {user} informing them of the decision')
+
+        else:
+            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The appeal has been accepted for {user}. You may want to apply a tier 3 warning upon return')
 
     @commands.Cog.listener()
     async def on_ready(self):
