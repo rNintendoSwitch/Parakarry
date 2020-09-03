@@ -63,6 +63,11 @@ class Mail(commands.Cog):
         if doc['_id'] in self.closeQueue:
             self.closeQueue[doc['_id']].cancel()
 
+        if doc['ban_appeal']:
+            app_info = await self.bot.application_info()
+            if ctx.author.id != app_info.owner.id:
+                return await ctx.send(':x: Only the bot owner can forcibly close a ban appeal thread. Use `!appeal accept` or `!appeal deny` instead')
+
         if delay:
             try:
                 delayDate = utils.resolve_duration(delay)
