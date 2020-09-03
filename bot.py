@@ -393,9 +393,11 @@ class Mail(commands.Cog):
 
         except discord.NotFound:
             guildMember = guild.get_member(member.id)
-            if guildMember and guild.get_role(config.modRole) not in guildMember.roles:
-                await member.send('You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned')
-                await member.kick(reason='Not banned on /r/NintendoSwitch')
+            if guildMember and guild.get_role(config.modRole) in guildMember.roles:
+                return
+
+            await member.send('You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned')
+            await member.kick(reason='Not banned on /r/NintendoSwitch')
 
 bot.add_cog(Mail(bot))
 bot.load_extension('jishaku')
