@@ -53,7 +53,7 @@ class Mail(commands.Cog):
     @commands.command(name='close')
     async def _close(self, ctx, delay: typing.Optional[str]):
         db = mclient.modmail.logs
-        doc = db.find_one({'channel_id': str(ctx.channel.id)})
+        doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True})
 
         if not doc:
             return await ctx.send('This is not a modmail channel!')
