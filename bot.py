@@ -317,7 +317,7 @@ class Mail(commands.Cog):
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Ban appeal denied | {user}')
-        embed.set_footer(text=doc['_id'])
+        embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
