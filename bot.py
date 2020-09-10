@@ -229,13 +229,13 @@ class Mail(commands.Cog):
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
-        await ctx.guild.unban(user, reason=f'Ban appeal accepted by {ctx.author}')
         punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set':{
             'active': False
         }})
         punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set':{
             'active': False
         }})
+        await ctx.guild.unban(user, reason=f'Ban appeal accepted by {ctx.author}')
         docID = str(uuid.uuid4())
         while punsDB.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
