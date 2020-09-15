@@ -320,6 +320,7 @@ class Mail(commands.Cog):
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
+        embed.add_field(name='Next appeal in', value=utils.humanize_duration(delayDate))
         embed.add_field(name='Reason', value=reason)
         await self.modLogs.send(embed=embed)
 
