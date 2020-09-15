@@ -356,10 +356,13 @@ class Mail(commands.Cog):
             pass # Ignore
 
         elif isinstance(error, commands.MissingRequiredArgument):
-            return await ctx.send(':x: Missing one or more aguments')
+            return await ctx.send(':x: Missing one or more aguments', delete_after=15)
 
         elif isinstance(error, commands.BadArgument):
-            return await ctx.send(':x: Invalid argument provided')
+            return await ctx.send(':x: Invalid argument provided', delete_after=15)
+
+        elif isinstance(error, commands.CheckFailure):
+            pass # Ignore
 
         else:
             await ctx.send(':x: An unknown error occured, contact the developer if this continues to happen')
