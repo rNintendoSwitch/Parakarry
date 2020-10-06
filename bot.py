@@ -334,7 +334,7 @@ class Mail(commands.Cog):
             await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author}')
 
         finally:
-            await utils._close_thread(self.bot, ctx, self.modLogs, dm=False, reason='[Appeal denied]' + reason)
+            await utils._close_thread(self.bot, ctx, self.modLogs, dm=False, reason='[Appeal denied] ' + reason)
             try:
                 member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
                 await member.kick(reason='Failed appeal')
