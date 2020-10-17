@@ -182,7 +182,12 @@ class Mail(commands.Cog):
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
             return await ctx.send(':x: Unable to open modmail to user -- there is already a thread involving them currently open')
 
-        await utils._trigger_create_thread(self.bot, member, ctx.message, open_type='moderator', moderator=ctx.author, content=content, anonymous=False)
+        try:
+            await utils._trigger_create_thread(self.bot, member, ctx.message, open_type='moderator', moderator=ctx.author, content=content, anonymous=False)
+
+        except discord.Forbidden:
+            return
+
         await ctx.send(f':white_check_mark: Modmail has been opened with {member}')
 
     @commands.has_any_role(config.modRole)
@@ -194,7 +199,12 @@ class Mail(commands.Cog):
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
             return await ctx.send(':x: Unable to open modmail to user -- there is already a thread involving them currently open')
 
-        await utils._trigger_create_thread(self.bot, member, ctx.message, open_type='moderator', moderator=ctx.author, content=content, anonymous=True)
+        try:
+            await utils._trigger_create_thread(self.bot, member, ctx.message, open_type='moderator', moderator=ctx.author, content=content, anonymous=True)
+
+        except discord.Forbidden:
+            return
+
         await ctx.send(f':white_check_mark: Modmail has been opened with {member}')
 
     @commands.has_any_role(config.modRole)
