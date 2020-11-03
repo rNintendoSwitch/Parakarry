@@ -116,6 +116,7 @@ class Mail(commands.Cog):
         if doc['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
             self.closeQueue[doc['_id']].cancel()
             await ctx.channel.send('Thread closure canceled due to moderator response')
+            self.closeQueue.pop(doc['_id'], None)
 
         recipient = doc['recipient']['id']
         member = ctx.guild.get_member(recipient)
@@ -401,6 +402,7 @@ class Mail(commands.Cog):
                 if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
                     self.closeQueue[thread['_id']].cancel()
                     await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send('Thread closure canceled due to user response')
+                    self.closeQueue.pop(thread['_id'], None)
 
                 description = message.content if message.content else None
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
@@ -511,6 +513,7 @@ class Mail(commands.Cog):
                         if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
                                 self.closeQueue[thread['_id']].cancel()
                                 await channel.send('Thread closure canceled due to user response')
+                                self.closeQueue.pop(thread['_id'], None)
 
                         db.update_one({'_id': thread['_id']}, {'$push': {'messages': { 
                             'timestamp': str(message.created_at),
