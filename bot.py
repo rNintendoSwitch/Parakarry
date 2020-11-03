@@ -79,7 +79,7 @@ class Mail(commands.Cog):
             event_loop = self.bot.loop
             close_action = event_loop.call_later(delayTime, event_loop.create_task, utils._close_thread(self.bot, ctx, self.modLogs))
             self.closeQueue[doc['_id']] = close_action
-            return await ctx.send('Thread scheduled to be closed. Will be closed in ' + utils.humanize_duration(delayDate))
+            return await ctx.send('Thread scheduled to be closed in ' + utils.humanize_duration(delayDate))
 
         await utils._close_thread(self.bot, ctx, self.modLogs)
 
@@ -115,8 +115,8 @@ class Mail(commands.Cog):
 
         if doc['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
             self.closeQueue[doc['_id']].cancel()
-            await ctx.channel.send('Thread closure canceled due to moderator response')
             self.closeQueue.pop(doc['_id'], None)
+            await ctx.channel.send('Thread closure has been canceled because a moderator has sent a message')
 
         recipient = doc['recipient']['id']
         member = ctx.guild.get_member(recipient)
@@ -401,8 +401,8 @@ class Mail(commands.Cog):
             if thread:
                 if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
                     self.closeQueue[thread['_id']].cancel()
-                    await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send('Thread closure canceled due to user response')
                     self.closeQueue.pop(thread['_id'], None)
+                    await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send('Thread closure has been canceled because the user has sent a message')
 
                 description = message.content if message.content else None
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
@@ -512,8 +512,8 @@ class Mail(commands.Cog):
 
                         if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
                                 self.closeQueue[thread['_id']].cancel()
-                                await channel.send('Thread closure canceled due to user response')
                                 self.closeQueue.pop(thread['_id'], None)
+                                await channel.send('Thread closure has been canceled because the user has sent a message')
 
                         db.update_one({'_id': thread['_id']}, {'$push': {'messages': { 
                             'timestamp': str(message.created_at),
