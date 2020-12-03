@@ -24,5 +24,5 @@ appealGuild = int: ban appeal guild id
 modRole = int: moderator role id
 
 # URLs
-logUrl = 'https://example.com/logs'
+logUrl = 'https://example.com/logs/'
 appealInvite = 'https://discord.gg/invite'
