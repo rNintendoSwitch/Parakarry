@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import datetime
 import time
@@ -9,7 +8,7 @@ from sys import exit
 
 import pymongo
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 import utils
 
