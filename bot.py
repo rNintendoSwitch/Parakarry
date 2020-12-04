@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import datetime
 import time
@@ -9,7 +8,7 @@ from sys import exit
 
 import pymongo
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 import utils
 
@@ -28,8 +27,10 @@ mclient = pymongo.MongoClient(
 	username=config.mongoUser,
 	password=config.mongoPass
 )
+
+intents = discord.Intents(guilds=True, members=True, bans=True, messages=True, typing=True)
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='DM to contact mods')
-bot = commands.Bot(config.command_prefixes, fetch_offline_members=True, activity=activityStatus, case_insensitive=True)
+bot = commands.Bot(config.command_prefixes, fetch_offline_members=True, activity=activityStatus, case_insensitive=True, intents=intents)
 
 class Mail(commands.Cog):
     def __init__(self, bot):

@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import re
 import time
