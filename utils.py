@@ -14,6 +14,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 punNames = {
+    'strike': '{} Strike{}',
     'tier1': 'T1 Warn',
     'tier2': 'T2 Warn',
     'tier3': 'T3 Warn',
@@ -281,7 +282,11 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
         description += '\n\n__User has active punishments:__\n'
         for pun in puns:
             timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
-            description += f"**{punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+            if pun['type'] == 'strike':
+                description += f"**{punNames[pun['type']].format(pun['strike_count'], 's' if pun['strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+
+            else:
+                description += f"**{punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
     embed.description = description
     mailMsg = await channel.send(embed=embed)
@@ -439,6 +444,9 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
             punType = punNames[pun['type']]
             if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
                 punishments += f'- [{stamp}] {punType}\n'
+
+            elif pun['type'] == 'strike':
+                punishments += f'+ [{stamp}] {punType.format(pun["strike_count"], "s" if pun["strike_count"] > 1 else "")}\n'
 
             else:
                 punishments += f'+ [{stamp}] {punType}\n'
