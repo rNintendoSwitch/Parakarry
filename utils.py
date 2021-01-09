@@ -353,7 +353,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     messages = mclient.bowser.messages.find({'author': user.id})
     msgCount = 0 if not messages else mclient.bowser.messages.count_documents({'author': user.id})
 
-    desc = f'Fetched user {user.mention}' if inServer else f'Fetched information about previous member {user.mention} ' \
+    desc = f'Fetched user {user.mention}.' if inServer else f'Fetched information about previous member {user.mention} ' \
         'from the API because they are not in this server. ' \
         'Showing last known data from before they left.'
 
@@ -424,9 +424,15 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
     else:
         puns = 0
+        activeStrikes = 0
+        totalStrikes = 0
         for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
+            if pun['type'] == 'strike':
+                totalStrikes += pun['strike_count']
+                activeStrikes += pun['active_strike_count']
+
             if puns >= 5:
-                break
+                continue
 
             puns += 1
             stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
@@ -440,5 +446,9 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
         punishments = f'Showing {puns}/{punsCnt} punishment entries. ' \
             f'For a full history including responsible moderator, active status, and more use `{bot.command_prefix[0]}history {user.id}`' \
             f'\n```diff\n{punishments}```'
+
+        if totalStrikes:
+            embed.description = embed.description + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes > 1 or activeStrikes < 1 else ""} ({totalStrikes} in total)'
+
     embed.add_field(name='Punishments', value=punishments, inline=False)
     return await ctx.send(embed=embed)
