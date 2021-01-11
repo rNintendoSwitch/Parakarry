@@ -436,6 +436,9 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
                 totalStrikes += pun['strike_count']
                 activeStrikes += pun['active_strike_count']
 
+            if pun['type'] == 'destrike':
+                totalStrikes -= pun['strike_count']
+
             if puns >= 5:
                 continue
 
