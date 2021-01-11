@@ -36,20 +36,6 @@ class Mail(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.READY = False
-        self.punNames = {
-            'tier1': 'T1 Warn',
-            'tier2': 'T2 Warn',
-            'tier3': 'T3 Warn',
-            'clear': 'Warn Clear',
-            'mute': 'Mute',
-            'unmute': 'Unmute',
-            'kick': 'Kick',
-            'ban': 'Ban',
-            'unban': 'Unban',
-            'blacklist': 'Blacklist',
-            'unblacklist': 'Unblacklist',
-            'note': 'User note'
-        }
         self.closeQueue = {}
 
     @commands.has_any_role(config.modRole)

@@ -14,6 +14,7 @@ mclient = pymongo.MongoClient(
 	password=config.mongoPass
 )
 punNames = {
+    'strike': '{} Strike{}',
     'tier1': 'T1 Warn',
     'tier2': 'T2 Warn',
     'tier3': 'T3 Warn',
@@ -281,7 +282,11 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
         description += '\n\n__User has active punishments:__\n'
         for pun in puns:
             timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
-            description += f"**{punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+            if pun['type'] == 'strike':
+                description += f"**{punNames[pun['type']].format(pun['strike_count'], 's' if pun['strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+
+            else:
+                description += f"**{punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
     embed.description = description
     mailMsg = await channel.send(embed=embed)
@@ -353,7 +358,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     messages = mclient.bowser.messages.find({'author': user.id})
     msgCount = 0 if not messages else mclient.bowser.messages.count_documents({'author': user.id})
 
-    desc = f'Fetched user {user.mention}' if inServer else f'Fetched information about previous member {user.mention} ' \
+    desc = f'Fetched user {user.mention}.' if inServer else f'Fetched information about previous member {user.mention} ' \
         'from the API because they are not in this server. ' \
         'Showing last known data from before they left.'
 
@@ -424,9 +429,18 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
     else:
         puns = 0
+        activeStrikes = 0
+        totalStrikes = 0
         for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
+            if pun['type'] == 'strike':
+                totalStrikes += pun['strike_count']
+                activeStrikes += pun['active_strike_count']
+
+            if pun['type'] == 'destrike':
+                totalStrikes -= pun['strike_count']
+
             if puns >= 5:
-                break
+                continue
 
             puns += 1
             stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
@@ -434,11 +448,18 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
             if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
                 punishments += f'- [{stamp}] {punType}\n'
 
+            elif pun['type'] == 'strike':
+                punishments += f'+ [{stamp}] {punType.format(pun["strike_count"], "s" if pun["strike_count"] > 1 else "")}\n'
+
             else:
                 punishments += f'+ [{stamp}] {punType}\n'
 
         punishments = f'Showing {puns}/{punsCnt} punishment entries. ' \
             f'For a full history including responsible moderator, active status, and more use `{bot.command_prefix[0]}history {user.id}`' \
             f'\n```diff\n{punishments}```'
+
+        if totalStrikes:
+            embed.description = embed.description + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes > 1 or activeStrikes < 1 else ""} ({totalStrikes} in total)'
+
     embed.add_field(name='Punishments', value=punishments, inline=False)
     return await ctx.send(embed=embed)
