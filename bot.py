@@ -262,10 +262,10 @@ class Mail(commands.Cog):
             await user.send(f'The moderators have decided to **lift your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\nIf you are unable to join try reloading your client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.\n\nReason given by moderators:\n```{reason}```')
 
         except:
-            await self.bot.get_channel(config.adminChannel).send(f':warning: The ban appeal for {user} has been accepted by {ctx.author}, but I was unable to DM them the decision. You may want to apply a tier 3 warning upon return')
+            await self.bot.get_channel(config.adminChannel).send(f':warning: The ban appeal for {user} has been accepted by {ctx.author}, but I was unable to DM them the decision')
 
         else:
-            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The ban appeal for {user} has been accepted by {ctx.author}. You may want to apply a tier 3 warning upon return')
+            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The ban appeal for {user} has been accepted by {ctx.author}')
 
         finally:
             await utils._close_thread(self.bot, ctx, self.modLogs, dm=False, reason='[Appeal accepted] ' + reason)
