@@ -10,18 +10,18 @@ mongoPass = 'password'
 mongoHost = 'host'
 
 # Channel IDs
-modLog = int: mod log channel id
-adminChannel = int: admin channel id
+modLog: int = mod_log_channel_id
+adminChannel: int = admin_channel_id
 
 # Category ID
-category = int: modmail category id
+category: int = modmail_category_id
 
 # Guild IDs
-guild = int: modmail guild id
-appealGuild = int: ban appeal guild id
+guild: int = modmail_guild_id
+appealGuild: int = ban_appeal_guild_id
 
 # Role ID
-modRole = int: moderator role id
+modRole: int = moderator_role_id
 
 # URLs
 logUrl = 'https://example.com/logs/'
