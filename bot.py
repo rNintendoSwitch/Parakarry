@@ -1,16 +1,17 @@
-import logging
 import datetime
+import logging
+import re
 import time
 import typing
-import re
 import uuid
 from sys import exit
 
-import pymongo
 import discord
+import pymongo
 from discord.ext import commands
 
 import utils
+
 
 LOG_FORMAT = '%(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
@@ -22,15 +23,14 @@ except ImportError:
     logging.critical('[Bot] config.py does not exist, you should make one from the example config')
     exit(1)
 
-mclient = pymongo.MongoClient(
-	config.mongoHost,
-	username=config.mongoUser,
-	password=config.mongoPass
-)
+mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 
 intents = discord.Intents(guilds=True, members=True, bans=True, messages=True, typing=True)
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='DM to contact mods')
-bot = commands.Bot(config.command_prefixes, fetch_offline_members=True, activity=activityStatus, case_insensitive=True, intents=intents)
+bot = commands.Bot(
+    config.command_prefixes, fetch_offline_members=True, activity=activityStatus, case_insensitive=True, intents=intents
+)
+
 
 class Mail(commands.Cog):
     def __init__(self, bot):
@@ -53,7 +53,9 @@ class Mail(commands.Cog):
         if doc['ban_appeal']:
             app_info = await self.bot.application_info()
             if ctx.author.id != app_info.owner.id:
-                return await ctx.send(':x: Only the bot owner can forcibly close a ban appeal thread. Use `!appeal accept` or `!appeal deny` instead')
+                return await ctx.send(
+                    ':x: Only the bot owner can forcibly close a ban appeal thread. Use `!appeal accept` or `!appeal deny` instead'
+                )
 
         if delay:
             try:
@@ -64,7 +66,9 @@ class Mail(commands.Cog):
                 return await ctx.send('Invalid duration')
 
             event_loop = self.bot.loop
-            close_action = event_loop.call_later(delayTime, event_loop.create_task, utils._close_thread(self.bot, ctx, self.modLogs))
+            close_action = event_loop.call_later(
+                delayTime, event_loop.create_task, utils._close_thread(self.bot, ctx, self.modLogs)
+            )
             self.closeQueue[doc['_id']] = close_action
             return await ctx.send('Thread scheduled to be closed in ' + utils.humanize_duration(delayDate))
 
@@ -94,13 +98,15 @@ class Mail(commands.Cog):
         if not content and not attachments:
             return await ctx.send('You must provide reply content, attachments, or both to use this command')
 
-        if ctx.channel.category_id != config.category or not doc: # No thread in channel, or not in modmail category
+        if ctx.channel.category_id != config.category or not doc:  # No thread in channel, or not in modmail category
             return await ctx.send('Cannot send a reply here, this is not a modmail channel!')
 
         if content and len(content) > 1800:
-            return await ctx.send(f'Wow there, thats a big reply. Please reduce it by at least {len(content) - 1800} characters')
+            return await ctx.send(
+                f'Wow there, thats a big reply. Please reduce it by at least {len(content) - 1800} characters'
+            )
 
-        if doc['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
+        if doc['_id'] in self.closeQueue.keys():  # Thread close was scheduled, cancel due to response
             self.closeQueue[doc['_id']].cancel()
             self.closeQueue.pop(doc['_id'], None)
             await ctx.channel.send('Thread closure has been canceled because a moderator has sent a message')
@@ -119,27 +125,38 @@ class Mail(commands.Cog):
                     return await ctx.send('There was an issue replying to this user, they may have left the server')
 
         try:
-            await member.send(f'Reply from **{"Moderator" if anonymous else ctx.author}**: {content if content else ""}')
+            await member.send(
+                f'Reply from **{"Moderator" if anonymous else ctx.author}**: {content if content else ""}'
+            )
             if attachments:
                 await member.send('\n'.join(attachments))
 
         except:
-            return await ctx.send('There was an issue replying to this user, they may have left the server or disabled DMs')
+            return await ctx.send(
+                'There was an issue replying to this user, they may have left the server or disabled DMs'
+            )
 
-        db.update_one({'_id': doc['_id']}, {'$push': {'messages': {
-            'timestamp': str(ctx.message.created_at),
-            'message_id': str(ctx.message.id),
-            'content': content if content else '',
-            'type': 'thread_message' if not anonymous else 'anonymous',
-            'author': {
-                'id': str(ctx.author.id),
-                'name': ctx.author.name,
-                'discriminator': ctx.author.discriminator,
-                'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
-                'mod': True
+        db.update_one(
+            {'_id': doc['_id']},
+            {
+                '$push': {
+                    'messages': {
+                        'timestamp': str(ctx.message.created_at),
+                        'message_id': str(ctx.message.id),
+                        'content': content if content else '',
+                        'type': 'thread_message' if not anonymous else 'anonymous',
+                        'author': {
+                            'id': str(ctx.author.id),
+                            'name': ctx.author.name,
+                            'discriminator': ctx.author.discriminator,
+                            'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
+                            'mod': True,
+                        },
+                        'attachments': attachments,
+                    }
+                }
             },
-            'attachments': attachments
-        }}})
+        )
 
         embed = discord.Embed(title='Moderator message', description=content, color=0x7ED321)
         if not anonymous:
@@ -147,16 +164,21 @@ class Mail(commands.Cog):
 
         else:
             embed.title = '[ANON] Moderator message'
-            embed.set_author(name=f'{ctx.author} ({ctx.author.id}) as r/NintendoSwitch', icon_url='https://cdn.mattbsg.xyz/rns/snoo.png')
+            embed.set_author(
+                name=f'{ctx.author} ({ctx.author.id}) as r/NintendoSwitch',
+                icon_url='https://cdn.mattbsg.xyz/rns/snoo.png',
+            )
 
-        if len(attachments) > 1: # More than one attachment, use fields
+        if len(attachments) > 1:  # More than one attachment, use fields
             for x in range(len(attachments)):
                 embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
 
-        elif attachments and re.search(r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE): # One attachment, image
+        elif attachments and re.search(
+            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+        ):  # One attachment, image
             embed.set_image(url=attachments[0])
 
-        elif attachments: # Still have an attachment, but not an image
+        elif attachments:  # Still have an attachment, but not an image
             embed.add_field(name=f'Attachment', value=attachments[0])
 
         await ctx.send(embed=embed)
@@ -168,10 +190,20 @@ class Mail(commands.Cog):
         Open a modmail thread with a user
         """
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
-            return await ctx.send(':x: Unable to open modmail to user -- there is already a thread involving them currently open')
+            return await ctx.send(
+                ':x: Unable to open modmail to user -- there is already a thread involving them currently open'
+            )
 
         try:
-            await utils._trigger_create_thread(self.bot, member, ctx.message, open_type='moderator', moderator=ctx.author, content=content, anonymous=False)
+            await utils._trigger_create_thread(
+                self.bot,
+                member,
+                ctx.message,
+                open_type='moderator',
+                moderator=ctx.author,
+                content=content,
+                anonymous=False,
+            )
 
         except discord.Forbidden:
             return
@@ -185,10 +217,20 @@ class Mail(commands.Cog):
         Open a modmail thread with a user anonymously
         """
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
-            return await ctx.send(':x: Unable to open modmail to user -- there is already a thread involving them currently open')
+            return await ctx.send(
+                ':x: Unable to open modmail to user -- there is already a thread involving them currently open'
+            )
 
         try:
-            await utils._trigger_create_thread(self.bot, member, ctx.message, open_type='moderator', moderator=ctx.author, content=content, anonymous=True)
+            await utils._trigger_create_thread(
+                self.bot,
+                member,
+                ctx.message,
+                open_type='moderator',
+                moderator=ctx.author,
+                content=content,
+                anonymous=True,
+            )
 
         except discord.Forbidden:
             return
@@ -204,7 +246,10 @@ class Mail(commands.Cog):
             for x in db.find({}):
                 tagList.append(x['_id'])
 
-            embed = discord.Embed(title='Snippet List', description='Here is a list of snippets you can repond with:\n\n' + ', '.join(tagList))
+            embed = discord.Embed(
+                title='Snippet List',
+                description='Here is a list of snippets you can repond with:\n\n' + ', '.join(tagList),
+            )
             return await ctx.send(embed=embed)
 
         doc = db.find_one({'_id': args[0]})
@@ -227,28 +272,26 @@ class Mail(commands.Cog):
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
-        punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set':{
-            'active': False
-        }})
-        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set':{
-            'active': False
-        }})
+        punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
+        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
         await ctx.guild.unban(user, reason=f'Ban appeal accepted by {ctx.author}')
         docID = str(uuid.uuid4())
-        while punsDB.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
+        while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
 
-        punsDB.insert_one({
-            '_id': docID,
-            'user': user.id,
-            'moderator': ctx.author.id,
-            'type': 'unban',
-            'timestamp': int(time.time()),
-            'reason': '[Ban appeal]' + reason,
-            'expiry': None,
-            'context': 'banappeal',
-            'active': False
-        })
+        punsDB.insert_one(
+            {
+                '_id': docID,
+                'user': user.id,
+                'moderator': ctx.author.id,
+                'type': 'unban',
+                'timestamp': int(time.time()),
+                'reason': '[Ban appeal]' + reason,
+                'expiry': None,
+                'context': 'banappeal',
+                'active': False,
+            }
+        )
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Ban appeal accepted | {user}')
@@ -259,13 +302,19 @@ class Mail(commands.Cog):
         await self.modLogs.send(embed=embed)
 
         try:
-            await user.send(f'The moderators have decided to **lift your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\nIf you are unable to join try reloading your client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.\n\nReason given by moderators:\n```{reason}```')
+            await user.send(
+                f'The moderators have decided to **lift your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\nIf you are unable to join try reloading your client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.\n\nReason given by moderators:\n```{reason}```'
+            )
 
         except:
-            await self.bot.get_channel(config.adminChannel).send(f':warning: The ban appeal for {user} has been accepted by {ctx.author}, but I was unable to DM them the decision')
+            await self.bot.get_channel(config.adminChannel).send(
+                f':warning: The ban appeal for {user} has been accepted by {ctx.author}, but I was unable to DM them the decision'
+            )
 
         else:
-            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The ban appeal for {user} has been accepted by {ctx.author}')
+            await self.bot.get_channel(config.adminChannel).send(
+                f':white_check_mark: The ban appeal for {user} has been accepted by {ctx.author}'
+            )
 
         finally:
             await utils._close_thread(self.bot, ctx, self.modLogs, dm=False, reason='[Appeal accepted] ' + reason)
@@ -295,23 +344,23 @@ class Mail(commands.Cog):
             return await ctx.send('Invalid duration')
 
         docID = str(uuid.uuid4())
-        while punsDB.find_one({'_id': docID}): # Uh oh, duplicate uuid generated
+        while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
 
-        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set':{
-            'active': False
-        }})
-        punsDB.insert_one({
-            '_id': docID,
-            'user': user.id,
-            'moderator': ctx.author.id,
-            'type': 'appealdeny',
-            'timestamp': int(time.time()),
-            'reason': reason,
-            'expiry': int(delayDate.timestamp()),
-            'context': 'banappeal',
-            'active': True
-        })
+        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
+        punsDB.insert_one(
+            {
+                '_id': docID,
+                'user': user.id,
+                'moderator': ctx.author.id,
+                'type': 'appealdeny',
+                'timestamp': int(time.time()),
+                'reason': reason,
+                'expiry': int(delayDate.timestamp()),
+                'context': 'banappeal',
+                'active': True,
+            }
+        )
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
         embed.set_author(name=f'Ban appeal denied | {user}')
@@ -323,13 +372,19 @@ class Mail(commands.Cog):
         await self.modLogs.send(embed=embed)
 
         try:
-            await user.send(f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __{delayDate.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(delayDate)})__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```')
+            await user.send(
+                f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __{delayDate.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(delayDate)})__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
+            )
 
         except:
-            await self.bot.get_channel(config.adminChannel).send(f':warning: The ban appeal for {user} has been denied by {ctx.author}, but I was unable to DM them the decision')
+            await self.bot.get_channel(config.adminChannel).send(
+                f':warning: The ban appeal for {user} has been denied by {ctx.author}, but I was unable to DM them the decision'
+            )
 
         else:
-            await self.bot.get_channel(config.adminChannel).send(f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author}')
+            await self.bot.get_channel(config.adminChannel).send(
+                f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author}'
+            )
 
         finally:
             await utils._close_thread(self.bot, ctx, self.modLogs, dm=False, reason='[Appeal denied] ' + reason)
@@ -351,7 +406,7 @@ class Mail(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.errors.CommandNotFound):
-            pass # Ignore
+            pass  # Ignore
 
         elif isinstance(error, commands.MissingRequiredArgument):
             return await ctx.send(':x: Missing one or more aguments', delete_after=15)
@@ -360,7 +415,7 @@ class Mail(commands.Cog):
             return await ctx.send(':x: Invalid argument provided', delete_after=15)
 
         elif isinstance(error, commands.CheckFailure):
-            pass # Ignore
+            pass  # Ignore
 
         else:
             await ctx.send(':x: An unknown error occured, contact the developer if this continues to happen')
@@ -376,71 +431,93 @@ class Mail(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot: return
+        if message.author.bot:
+            return
         attachments = [x.url for x in message.attachments]
         ctx = await self.bot.get_context(message)
 
         # Do something to check category, and add message to log
         if message.channel.type == discord.ChannelType.private:
-            # User has sent a DM -- check 
+            # User has sent a DM -- check
             db = mclient.modmail.logs
             thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
             if thread:
-                if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
+                if thread['_id'] in self.closeQueue.keys():  # Thread close was scheduled, cancel due to response
                     self.closeQueue[thread['_id']].cancel()
                     self.closeQueue.pop(thread['_id'], None)
-                    await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send('Thread closure has been canceled because the user has sent a message')
+                    await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
+                        'Thread closure has been canceled because the user has sent a message'
+                    )
 
                 description = message.content if message.content else None
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
 
-                if len(attachments) > 1: # More than one attachment, use fields
+                if len(attachments) > 1:  # More than one attachment, use fields
                     for x in range(len(attachments)):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
 
-                elif attachments and re.search(r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE): # One attachment, image
+                elif attachments and re.search(
+                    r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+                ):  # One attachment, image
                     embed.set_image(url=attachments[0])
 
-                elif attachments: # Still have an attachment, but not an image
+                elif attachments:  # Still have an attachment, but not an image
                     embed.add_field(name=f'Attachment', value=attachments[0])
 
-                await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(embed=embed)
-                db.update_one({'_id': thread['_id']}, {'$push': {'messages': {
-                    'timestamp': str(message.created_at),
-                    'message_id': str(message.id),
-                    'content': message.content,
-                    'type': 'thread_message',
-                    'author': {
-                        'id': str(message.author.id),
-                        'name': message.author.name,
-                        'discriminator': message.author.discriminator,
-                        'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
-                        'mod': False
+                await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
+                    embed=embed
+                )
+                db.update_one(
+                    {'_id': thread['_id']},
+                    {
+                        '$push': {
+                            'messages': {
+                                'timestamp': str(message.created_at),
+                                'message_id': str(message.id),
+                                'content': message.content,
+                                'type': 'thread_message',
+                                'author': {
+                                    'id': str(message.author.id),
+                                    'name': message.author.name,
+                                    'discriminator': message.author.discriminator,
+                                    'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                                    'mod': False,
+                                },
+                                'attachments': attachments,
+                            }
+                        }
                     },
-                    'attachments': attachments
-                }}})
+                )
 
             else:
                 try:
                     thread = await utils._trigger_create_thread(self.bot, message.author, message, 'user')
-                except RuntimeError:
+                except RuntimeError as e:
+                    logging.critical(
+                        f'Exception thrown when calling utils._trigger_create_thread() with user {message.author.id}: %s',
+                        e,
+                    )
                     return
 
                 # TODO: Don't duplicate message embed code based on new thread or just new message
-                embed = discord.Embed(title='New message', description=message.content if message.content else None, color=0x32B6CE)
+                embed = discord.Embed(
+                    title='New message', description=message.content if message.content else None, color=0x32B6CE
+                )
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
 
-                if len(attachments) > 1: # More than one attachment, use fields
+                if len(attachments) > 1:  # More than one attachment, use fields
                     for x in range(len(attachments)):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
 
-                elif attachments and re.search(r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE): # One attachment, image
+                elif attachments and re.search(
+                    r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+                ):  # One attachment, image
                     embed.set_image(url=attachments[0])
 
-                elif attachments: # Still have an attachment, but not an image
+                elif attachments:  # Still have an attachment, but not an image
                     embed.add_field(name=f'Attachment', value=attachments[0])
 
                 await thread.send(embed=embed)
@@ -451,23 +528,33 @@ class Mail(commands.Cog):
             db = mclient.modmail.logs
             doc = db.find_one({'channel_id': str(message.channel.id)})
             if doc:
-                if not ctx.valid: # Not an invoked command, mark as internal message
-                    db.update_one({'_id': doc['_id']}, {'$push': {'messages': {
-                        'timestamp': str(message.created_at),
-                        'message_id': str(message.id),
-                        'content': message.content,
-                        'type': 'internal',
-                        'author': {
-                            'id': str(message.author.id),
-                            'name': message.author.name,
-                            'discriminator': message.author.discriminator,
-                            'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
-                            'mod': True
+                if not ctx.valid:  # Not an invoked command, mark as internal message
+                    db.update_one(
+                        {'_id': doc['_id']},
+                        {
+                            '$push': {
+                                'messages': {
+                                    'timestamp': str(message.created_at),
+                                    'message_id': str(message.id),
+                                    'content': message.content,
+                                    'type': 'internal',
+                                    'author': {
+                                        'id': str(message.author.id),
+                                        'name': message.author.name,
+                                        'discriminator': message.author.discriminator,
+                                        'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                                        'mod': True,
+                                    },
+                                    'attachments': attachments,
+                                }
+                            }
                         },
-                        'attachments': attachments
-                    }}})
+                    )
 
-        elif message.channel.type == discord.ChannelType.text and not ctx.guild.get_role(config.modRole) in message.author.roles:
+        elif (
+            message.channel.type == discord.ChannelType.text
+            and not ctx.guild.get_role(config.modRole) in message.author.roles
+        ):
             # Regex to match pings with text content after, and none before. Groups: ping id, text content
             match = re.search(r'^\s*<@!?(\d{15,})>\s+(\S(?:.|\n|\r)+)$', message.content)
 
@@ -477,58 +564,77 @@ class Mail(commands.Cog):
                 db = mclient.modmail.logs
                 thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
                 content = match.group(2)
-  
+
                 embed = discord.Embed(title='New modmail mention', description=content, color=0x7289DA)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
-                embed.add_field(name=f'Mentioned in', value=f'<#{message.channel.id}> ([Jump to context]({message.jump_url}))')
+                embed.add_field(
+                    name=f'Mentioned in', value=f'<#{message.channel.id}> ([Jump to context]({message.jump_url}))'
+                )
 
                 try:
                     dm_embed = discord.Embed(description=content, color=0x7289DA)
                     dm_embed.set_author(name=f'{message.author}', icon_url=message.author.avatar_url)
-                    dm_message = await message.author.send(f'You mentioned {self.bot.user.name} in <#{message.channel.id}>', embed=dm_embed)
-                    await dm_message.add_reaction('✅') # We don't need to do this but it matches the design language
+                    dm_message = await message.author.send(
+                        f'You mentioned {self.bot.user.name} in <#{message.channel.id}>', embed=dm_embed
+                    )
+                    await dm_message.add_reaction('✅')  # We don't need to do this but it matches the design language
 
                 except (discord.HTTPException, discord.Forbidden, discord.NotFound):
-                    await self.bot.get_channel(config.adminChannel).send(f'Cannot create thread for mention from <@{message.author.id}> (failed to send DM)', embed=embed)
-                    await message.channel.send(f'<@{message.author.id}> You must open your DMs to use modmail threads. Moderators may still receive your mention.', delete_after=30)
+                    await self.bot.get_channel(config.adminChannel).send(
+                        f'Cannot create thread for mention from <@{message.author.id}> (failed to send DM)', embed=embed
+                    )
+                    await message.channel.send(
+                        f'<@{message.author.id}> You must open your DMs to use modmail threads. Moderators may still receive your mention.',
+                        delete_after=30,
+                    )
 
                 else:
-                    if thread: 
+                    if thread:
                         channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
 
-                        if thread['_id'] in self.closeQueue.keys(): # Thread close was scheduled, cancel due to response
-                                self.closeQueue[thread['_id']].cancel()
-                                self.closeQueue.pop(thread['_id'], None)
-                                await channel.send('Thread closure has been canceled because the user has sent a message')
+                        if (
+                            thread['_id'] in self.closeQueue.keys()
+                        ):  # Thread close was scheduled, cancel due to response
+                            self.closeQueue[thread['_id']].cancel()
+                            self.closeQueue.pop(thread['_id'], None)
+                            await channel.send('Thread closure has been canceled because the user has sent a message')
 
-                        db.update_one({'_id': thread['_id']}, {'$push': {'messages': { 
-                            'timestamp': str(message.created_at),
-                            'message_id': str(message.id),
-                            'content': message.content,
-                            'type': 'mention',
-                            'author': {
-                                'id': str(message.author.id),
-                                'name': message.author.name,
-                                'discriminator': message.author.discriminator,
-                                'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
-                                'mod': False
+                        db.update_one(
+                            {'_id': thread['_id']},
+                            {
+                                '$push': {
+                                    'messages': {
+                                        'timestamp': str(message.created_at),
+                                        'message_id': str(message.id),
+                                        'content': message.content,
+                                        'type': 'mention',
+                                        'author': {
+                                            'id': str(message.author.id),
+                                            'name': message.author.name,
+                                            'discriminator': message.author.discriminator,
+                                            'avatar_url': str(
+                                                message.author.avatar_url_as(static_format='png', size=1024)
+                                            ),
+                                            'mod': False,
+                                        },
+                                        'attachments': attachments,
+                                        'channel': {'id': message.channel.id, 'name': message.channel.name},
+                                    }
+                                }
                             },
-                            'attachments': attachments,
-                            'channel': {
-                                'id': message.channel.id,
-                                'name': message.channel.name
-                            }
-                        }}})
-        
+                        )
+
                     else:
-                        channel = await utils._trigger_create_thread(self.bot, message.author, message, 'user', is_mention=True)
+                        channel = await utils._trigger_create_thread(
+                            self.bot, message.author, message, 'user', is_mention=True
+                        )
 
                     await channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        if member.guild.id != config.appealGuild: # Return if guild not the appeal server
+        if member.guild.id != config.appealGuild:  # Return if guild not the appeal server
             return
 
         guild = self.bot.get_guild(config.guild)
@@ -540,10 +646,13 @@ class Mail(commands.Cog):
             if guildMember and guild.get_role(config.modRole) in guildMember.roles:
                 return
 
-            await member.send('You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned')
+            await member.send(
+                'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned'
+            )
             await member.kick(reason='Not banned on /r/NintendoSwitch')
 
         await utils._can_appeal(member)
+
 
 bot.add_cog(Mail(bot))
 bot.load_extension('jishaku')
