@@ -495,7 +495,10 @@ class Mail(commands.Cog):
                 try:
                     thread = await utils._trigger_create_thread(self.bot, message.author, message, 'user')
                 except RuntimeError as e:
-                    logging.critical(f'Exception thrown when calling utils._trigger_create_thread() with user {message.author.id}: %s', e)
+                    logging.critical(
+                        f'Exception thrown when calling utils._trigger_create_thread() with user {message.author.id}: %s',
+                        e,
+                    )
                     return
 
                 # TODO: Don't duplicate message embed code based on new thread or just new message
