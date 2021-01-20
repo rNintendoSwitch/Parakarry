@@ -15,6 +15,7 @@ mclient = pymongo.MongoClient(
 )
 punNames = {
     'strike': '{} Strike{}',
+    'destrike': 'Removed {} Strike{}',
     'tier1': 'T1 Warn',
     'tier2': 'T2 Warn',
     'tier3': 'T3 Warn',
@@ -285,7 +286,7 @@ async def _trigger_create_thread(bot, member, message, open_type, is_mention=Fal
         for pun in puns:
             timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
             if pun['type'] == 'strike':
-                description += f"**{punNames[pun['type']].format(pun['strike_count'], 's' if pun['strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+                description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
             else:
                 description += f"**{punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
@@ -447,7 +448,10 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
             puns += 1
             stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
             punType = punNames[pun['type']]
-            if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist']:
+            if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist', 'destrike']:
+                if pun['type'] == 'destrike':
+                    punType = f'Removed {pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
+
                 punishments += f'- [{stamp}] {punType}\n'
 
             elif pun['type'] == 'strike':
