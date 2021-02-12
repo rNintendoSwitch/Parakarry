@@ -258,7 +258,7 @@ async def _trigger_create_thread(
         else:
             if not await _can_appeal(member):
                 raise RuntimeError('User cannot appeal')
-               
+
     # Deny thread creation if modmail restricted
     if open_type == 'user' and not banAppeal:
         if not mclient.bowser.users.find_one({'_id': member.id})['modmail']:
