@@ -253,7 +253,10 @@ async def _trigger_create_thread(
             await member.send(
                 'You are not banned from /r/NintendoSwitch and have been kicked from the ban appeal server.'
             )
-            await appealGuild.fetch_member(member.id).kick(reason='Member is not banned on /r/NintendoSwitch')
+            appealMember = await appealGuild.fetch_member(member.id)
+            await appealMember.kick(reason='Member is not banned on /r/NintendoSwitch')
+
+            raise RuntimeError('User is not banned from server')
 
         else:
             if not await _can_appeal(member):
