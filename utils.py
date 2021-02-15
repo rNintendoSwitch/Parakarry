@@ -238,14 +238,6 @@ async def _trigger_create_thread(
     punsDB = mclient.bowser.puns
     banAppeal = False
 
-    if open_type == 'user':
-        if not mclient.bowser.users.find_one({'_id': member.id})['modmail']:  # Modmail restricted, deny thread creation
-            await member.send(
-                'Sorry, I cannot create a new modmail thread because you are currently blacklisted. '
-                'You may DM a moderator if you still need to contact a Discord staff member.'
-            )
-            raise RuntimeError('User is blacklisted from modmail')
-
     guild = bot.get_guild(config.guild)
     appealGuild = bot.get_guild(config.appealGuild)
     try:
@@ -261,11 +253,23 @@ async def _trigger_create_thread(
             await member.send(
                 'You are not banned from /r/NintendoSwitch and have been kicked from the ban appeal server.'
             )
-            await appealGuild.fetch_member(member.id).kick(reason='Member is not banned on /r/NintendoSwitch')
+            appealMember = await appealGuild.fetch_member(member.id)
+            await appealMember.kick(reason='Member is not banned on /r/NintendoSwitch')
+
+            raise RuntimeError('User is not banned from server')
 
         else:
             if not await _can_appeal(member):
                 raise RuntimeError('User cannot appeal')
+
+    # Deny thread creation if modmail restricted
+    if open_type == 'user' and not banAppeal:
+        if not mclient.bowser.users.find_one({'_id': member.id})['modmail']:
+            await member.send(
+                'Sorry, I cannot create a new modmail thread because you are currently blacklisted. '
+                'You may DM a moderator if you still need to contact a Discord staff member.'
+            )
+            raise RuntimeError('User is blacklisted from modmail')
 
     category = guild.get_channel(config.category)
     channelName = f'{member.name}-{member.discriminator}'
