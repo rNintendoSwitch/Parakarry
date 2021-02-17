@@ -430,6 +430,20 @@ class Mail(commands.Cog):
                 await self.bot.get_channel(int(doc['channel_id'])).trigger_typing()
 
     @commands.Cog.listener()
+    async def on_member_ban(self, guild, member):
+        db = mclient.modmail.logs
+        thread = db.find_one({'recipient.id': str(member.id), 'open': True})
+        if thread:
+            message = (
+                await self.bot.get_guild(int(thread['guild_id']))
+                .get_channel(int(thread['channel_id']))
+                .send(f'**{member}** has been banned from the server')
+            )
+            if not thread['ban_appeal']:
+                ctx = await self.bot.get_context(message)
+                await self._close.__call__(ctx, '5s')
+
+    @commands.Cog.listener()
     async def on_member_join(self, member):
         db = mclient.modmail.logs
         thread = db.find_one({'recipient.id': str(member.id), 'open': True})
