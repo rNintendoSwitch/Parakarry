@@ -430,6 +430,51 @@ class Mail(commands.Cog):
                 await self.bot.get_channel(int(doc['channel_id'])).trigger_typing()
 
     @commands.Cog.listener()
+    async def on_member_join(self, member):
+        db = mclient.modmail.logs
+        thread = db.find_one({'recipient.id': str(member.id), 'open': True})
+        if thread:
+            await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
+                f'**{member}** has rejoined the server, thread closure has been canceled'
+            )
+            if not thread['ban_appeal']:
+                self.closeQueue[thread['_id']].cancel()
+                self.closeQueue.pop(thread['_id'], None)
+
+        if member.guild.id != config.appealGuild:  # Return if guild not the appeal server
+            return
+
+        guild = self.bot.get_guild(config.guild)
+        try:
+            await guild.fetch_ban(member)
+
+        except discord.NotFound:
+            guildMember = guild.get_member(member.id)
+            if guildMember and guild.get_role(config.modRole) in guildMember.roles:
+                return
+
+            await member.send(
+                'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned'
+            )
+            await member.kick(reason='Not banned on /r/NintendoSwitch')
+
+        await utils._can_appeal(member)
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member):
+        db = mclient.modmail.logs
+        thread = db.find_one({'recipient.id': str(member.id), 'open': True})
+        if thread:
+            message = (
+                await self.bot.get_guild(int(thread['guild_id']))
+                .get_channel(int(thread['channel_id']))
+                .send(f'**{member}** has left the server')
+            )
+            if not thread['ban_appeal']:
+                ctx = await self.bot.get_context(message)
+                await self._close.__call__(ctx, '4h')
+
+    @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
@@ -631,27 +676,6 @@ class Mail(commands.Cog):
                         )
 
                     await channel.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_member_join(self, member):
-        if member.guild.id != config.appealGuild:  # Return if guild not the appeal server
-            return
-
-        guild = self.bot.get_guild(config.guild)
-        try:
-            await guild.fetch_ban(member)
-
-        except discord.NotFound:
-            guildMember = guild.get_member(member.id)
-            if guildMember and guild.get_role(config.modRole) in guildMember.roles:
-                return
-
-            await member.send(
-                'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned'
-            )
-            await member.kick(reason='Not banned on /r/NintendoSwitch')
-
-        await utils._can_appeal(member)
 
 
 bot.add_cog(Mail(bot))
