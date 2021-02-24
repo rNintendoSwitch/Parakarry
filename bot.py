@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import re
@@ -476,6 +477,7 @@ class Mail(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
+        await asyncio.sleep(10)  # Wait for ban to pass and thread to close in-case
         db = mclient.modmail.logs
         thread = db.find_one({'recipient.id': str(member.id), 'open': True})
         if thread:
