@@ -258,11 +258,7 @@ class Mail(commands.Cog):
     @commands.has_any_role(config.modRole)
     @commands.group(name='appeal', case_insensitive=True, invoke_without_command=True)
     async def _appeal(self, ctx):
-        if ctx.command:
-            cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
-        else:
-            cmd_str = '<command>'
-
+        cmd_str = ctx.command.full_parent_name + ' ' + ctx.command.name if ctx.command.parent else ctx.command.name
         await ctx.send(f':x: Incorrect usage. See `{ctx.prefix}help {cmd_str}`')
 
     @commands.has_any_role(config.modRole)
