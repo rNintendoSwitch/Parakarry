@@ -1,7 +1,7 @@
 FROM gorialis/discord.py:master
 
-WORKDIR /app
-ADD . /app
+WORKDIR /Parakarry
+COPY . /Parakarry
 
 EXPOSE 8880
 
