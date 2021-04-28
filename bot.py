@@ -442,7 +442,7 @@ class Mail(commands.Cog):
             )
             if not thread['ban_appeal']:
                 ctx = await self.bot.get_context(message)
-                await self._close.__call__(ctx, '5s')
+                await self._close.__call__(ctx, None)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
