@@ -186,7 +186,7 @@ class Mail(commands.Cog):
             {
                 '$push': {
                     'messages': {
-                        'timestamp': str(ctx.message.created_at),
+                        'timestamp': str(datetime.datetime.utcnow().isoformat(sep=' ')),
                         'message_id': str(ctx.message.id),
                         'content': content if content else '',
                         'type': 'thread_message' if not anonymous else 'anonymous',
