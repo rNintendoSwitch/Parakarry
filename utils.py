@@ -355,7 +355,7 @@ async def _trigger_create_user_thread(
     return channel
 
 
-async def _trigger_create_mod_thread(self, bot, guild, member, moderator):
+async def _trigger_create_mod_thread(bot, guild, member, moderator):
     db = mclient.modmail.logs
     punsDB = mclient.bowser.puns
 
