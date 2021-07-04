@@ -406,6 +406,13 @@ async def _trigger_create_mod_thread(self, bot, guild, member, moderator, anonym
         )
         raise
 
+    embed = discord.Embed(
+        title='Thread is open',
+        description='This thread is now open to moderator and user replies. Start the conversation by using `/reply` or `/areply`',
+        color=0x58B9FF,
+    )
+    await channel.send(embed=embed)
+
 
 async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     inServer = True
