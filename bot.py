@@ -301,7 +301,7 @@ class Mail(commands.Cog):
             )
 
         try:
-            await utils._trigger_create_thread(
+            await utils._trigger_create_user_thread(
                 self.bot,
                 member,
                 ctx.message,
@@ -631,10 +631,10 @@ class Mail(commands.Cog):
 
             else:
                 try:
-                    thread = await utils._trigger_create_thread(self.bot, message.author, message, 'user')
+                    thread = await utils._trigger_create_user_thread(self.bot, message.author, message, 'user')
                 except RuntimeError as e:
                     logging.critical(
-                        f'Exception thrown when calling utils._trigger_create_thread() with user {message.author.id}: %s',
+                        f'Exception thrown when calling utils._trigger_create_user_thread() with user {message.author.id}: %s',
                         e,
                     )
                     return
