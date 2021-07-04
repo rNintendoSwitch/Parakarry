@@ -401,13 +401,11 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
 
     embed.description = description
     mailMsg = await channel.send(embed=embed)
-    await _info(await bot.get_context(mailMsg), bot, guild.fetch_member(member.id))
+    await _info(await bot.get_context(mailMsg), bot, await guild.fetch_member(member.id))
     try:
         await member.send(
             f'Hi there!\nThe chat moderators who oversee the **{guild.name}** Discord have opened a modmail with you!\n\nI will send you a message when a moderator responds to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅.'
         )
-
-        await channel.send(embed=embed)
 
     except discord.Forbidden:
         # Cleanup if there really was an issue messaging the user, i.e. bot blocked
