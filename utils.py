@@ -136,7 +136,7 @@ async def _create_thread(
     content=None,
     is_mod=False,
     ban_appeal=False,
-    messsage=None,
+    message=None,
     created_at=None,
 ):
     db = mclient.modmail.logs
