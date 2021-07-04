@@ -3,13 +3,15 @@ import datetime
 import logging
 import re
 import time
-import typing
 import uuid
 from sys import exit
 
 import discord
 import pymongo
 from discord.ext import commands
+from discord_slash import SlashCommand, cog_ext, SlashContext
+from discord_slash.utils.manage_commands import create_option, create_permission
+from discord_slash.model import SlashCommandOptionType, SlashCommandPermissionType
 
 import utils
 
@@ -31,6 +33,8 @@ activityStatus = discord.Activity(type=discord.ActivityType.playing, name='DM to
 bot = commands.Bot(
     config.command_prefixes, fetch_offline_members=True, activity=activityStatus, case_insensitive=True, intents=intents
 )
+slash = SlashCommand(bot)
+guildList = [config.guild]
 
 
 class Mail(commands.Cog):
@@ -38,10 +42,24 @@ class Mail(commands.Cog):
         self.bot = bot
         self.READY = False
         self.closeQueue = {}
+        loop = bot.loop
+        loop.create_task(slash.sync_all_commands(delete_from_unused_guilds=True))
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='close')
-    async def _close(self, ctx, delay: typing.Optional[str]):
+    @cog_ext.cog_slash(
+        name='close',
+        guild_ids=guildList,
+        description='Closes a modmail thread, optionally with a delay',
+        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        options=[
+            create_option(
+                name='delay',
+                description='The delay for the modmail to close, in 1w2d3h4m5s format',
+                option_type=SlashCommandOptionType.STRING,
+                required=False,
+            )
+        ],
+    )
+    async def _close(self, ctx: SlashContext, delay: str = None):
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True})
 
@@ -75,17 +93,41 @@ class Mail(commands.Cog):
 
         await utils._close_thread(self.bot, ctx, self.modLogs)
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='reply', aliases=['r'])
-    async def _reply_user(self, ctx, *, content: typing.Optional[str]):
+    @cog_ext.cog_slash(
+        name='reply',
+        guild_ids=guildList,
+        description='Replys to a modmail, with your username',
+        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        options=[
+            create_option(
+                name='content',
+                description='The message to send to the user',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            )
+        ],
+    )
+    async def _reply_user(self, ctx: SlashContext, *, content):
         """
         Reply to an open modmail thread
         """
         await self._reply(ctx, content)
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='areply', aliases=['ar'])
-    async def _reply_anon(self, ctx, *, content: typing.Optional[str]):
+    @cog_ext.cog_slash(
+        name='areply',
+        guild_ids=guildList,
+        description='Replys to a modmail, anonymously',
+        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        options=[
+            create_option(
+                name='content',
+                description='The message to send to the user',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            )
+        ],
+    )
+    async def _reply_anon(self, ctx: SlashContext, *, content):
         """
         Reply to an open modmail thread anonymously
         """
@@ -184,9 +226,27 @@ class Mail(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='open')
-    async def _open_thread(self, ctx, member: discord.Member, *, content):
+    @cog_ext.cog_slash(
+        name='open',
+        guild_ids=guildList,
+        description='Open a modmail thread with a user, using your username',
+        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        options=[
+            create_option(
+                name='member',
+                description='The user to start a thread with',
+                option_type=SlashCommandOptionType.USER,
+                required=True,
+            ),
+            create_option(
+                name='content',
+                description='The message to send to the user',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+        ],
+    )
+    async def _open_thread(self, ctx: SlashContext, member, *, content):
         """
         Open a modmail thread with a user
         """
@@ -211,9 +271,27 @@ class Mail(commands.Cog):
 
         await ctx.send(f':white_check_mark: Modmail has been opened with {member}')
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='aopen')
-    async def _open_thread_anon(self, ctx, member: discord.Member, *, content):
+    @cog_ext.cog_slash(
+        name='aopen',
+        guild_ids=guildList,
+        description='Open a modmail thread with a user, anonymously',
+        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        options=[
+            create_option(
+                name='member',
+                description='The user to start a thread with',
+                option_type=SlashCommandOptionType.USER,
+                required=True,
+            ),
+            create_option(
+                name='content',
+                description='The message to send to the user',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+        ],
+    )
+    async def _open_thread_anon(self, ctx: SlashContext, member, *, content):
         """
         Open a modmail thread with a user anonymously
         """
