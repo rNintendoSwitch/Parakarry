@@ -136,10 +136,12 @@ class Mail(commands.Cog):
     async def _reply(self, ctx, content, anonymous=False):
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(ctx.channel.id)})
-        attachments = [x.url for x in ctx.message.attachments]
+        # Attachments are unable to be sent mod -> user with slash commands (unless it's a url).
+        #
+        # attachments = [x.url for x in ctx.message.attachments]
 
-        if not content and not attachments:
-            return await ctx.send('You must provide reply content, attachments, or both to use this command')
+        # if not content and not attachments:
+        #    return await ctx.send('You must provide reply content, attachments, or both to use this command')
 
         if ctx.channel.category_id != config.category or not doc:  # No thread in channel, or not in modmail category
             return await ctx.send('Cannot send a reply here, this is not a modmail channel!')
@@ -171,8 +173,8 @@ class Mail(commands.Cog):
             await member.send(
                 f'Reply from **{"Moderator" if anonymous else ctx.author}**: {content if content else ""}'
             )
-            if attachments:
-                await member.send('\n'.join(attachments))
+            # if attachments:
+            #    await member.send('\n'.join(attachments))
 
         except:
             return await ctx.send(
@@ -194,8 +196,8 @@ class Mail(commands.Cog):
                             'discriminator': ctx.author.discriminator,
                             'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
                             'mod': True,
-                        },
-                        'attachments': attachments,
+                        }  # ,
+                        #'attachments': attachments,
                     }
                 }
             },
@@ -212,17 +214,17 @@ class Mail(commands.Cog):
                 icon_url='https://cdn.mattbsg.xyz/rns/snoo.png',
             )
 
-        if len(attachments) > 1:  # More than one attachment, use fields
-            for x in range(len(attachments)):
-                embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
-
-        elif attachments and re.search(
-            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
-        ):  # One attachment, image
-            embed.set_image(url=attachments[0])
-
-        elif attachments:  # Still have an attachment, but not an image
-            embed.add_field(name=f'Attachment', value=attachments[0])
+        #        if len(attachments) > 1:  # More than one attachment, use fields
+        #            for x in range(len(attachments)):
+        #                embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
+        #
+        #        elif attachments and re.search(
+        #            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+        #        ):  # One attachment, image
+        #            embed.set_image(url=attachments[0])
+        #
+        #        elif attachments:  # Still have an attachment, but not an image
+        #            embed.add_field(name=f'Attachment', value=attachments[0])
 
         await ctx.send(embed=embed)
 
