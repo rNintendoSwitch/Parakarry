@@ -181,28 +181,6 @@ class Mail(commands.Cog):
                 'There was an issue replying to this user, they may have left the server or disabled DMs'
             )
 
-        db.update_one(
-            {'_id': doc['_id']},
-            {
-                '$push': {
-                    'messages': {
-                        'timestamp': str(datetime.datetime.utcnow().isoformat(sep=' ')),
-                        'message_id': str(ctx.message.id),
-                        'content': content if content else '',
-                        'type': 'thread_message' if not anonymous else 'anonymous',
-                        'author': {
-                            'id': str(ctx.author.id),
-                            'name': ctx.author.name,
-                            'discriminator': ctx.author.discriminator,
-                            'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
-                            'mod': True,
-                        }  # ,
-                        #'attachments': attachments,
-                    }
-                }
-            },
-        )
-
         embed = discord.Embed(title='Moderator message', description=content, color=0x7ED321)
         if not anonymous:
             embed.set_author(name=f'{ctx.author} ({ctx.author.id})', icon_url=ctx.author.avatar_url)
@@ -226,7 +204,29 @@ class Mail(commands.Cog):
         #        elif attachments:  # Still have an attachment, but not an image
         #            embed.add_field(name=f'Attachment', value=attachments[0])
 
-        await ctx.send(embed=embed)
+        mailMsg = await ctx.send(embed=embed)
+
+        db.update_one(
+            {'_id': doc['_id']},
+            {
+                '$push': {
+                    'messages': {
+                        'timestamp': str(datetime.datetime.utcnow().isoformat(sep=' ')),
+                        'message_id': str(mailMsg.id),
+                        'content': content if content else '',
+                        'type': 'thread_message' if not anonymous else 'anonymous',
+                        'author': {
+                            'id': str(ctx.author.id),
+                            'name': ctx.author.name,
+                            'discriminator': ctx.author.discriminator,
+                            'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
+                            'mod': True,
+                        }  # ,
+                        #'attachments': attachments,
+                    }
+                }
+            },
+        )
 
     @cog_ext.cog_slash(
         name='open',
