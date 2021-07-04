@@ -240,7 +240,7 @@ class Mail(commands.Cog):
             )
         ],
     )
-    async def _open_thread(self, ctx: SlashContext, member, *, content):
+    async def _open_thread(self, ctx: SlashContext, member):
         """
         Open a modmail thread with a user
         """
@@ -257,48 +257,7 @@ class Mail(commands.Cog):
                 ctx.message,
                 open_type='moderator',
                 moderator=ctx.author,
-                content=content,
                 anonymous=False,
-            )
-
-        except discord.Forbidden:
-            return
-
-        await ctx.send(f':white_check_mark: Modmail has been opened with {member}')
-
-    @cog_ext.cog_slash(
-        name='aopen',
-        guild_ids=guildList,
-        description='Open a modmail thread with a user, anonymously',
-        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
-        options=[
-            create_option(
-                name='member',
-                description='The user to start a thread with',
-                option_type=SlashCommandOptionType.USER,
-                required=True,
-            )
-        ],
-    )
-    async def _open_thread_anon(self, ctx: SlashContext, member, *, content):
-        """
-        Open a modmail thread with a user anonymously
-        """
-        await ctx.defer()
-        if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
-            return await ctx.send(
-                ':x: Unable to open modmail to user -- there is already a thread involving them currently open'
-            )
-
-        try:
-            await utils._trigger_create_mod_thread(
-                self.bot,
-                member,
-                ctx.message,
-                open_type='moderator',
-                moderator=ctx.author,
-                content=content,
-                anonymous=True,
             )
 
         except discord.Forbidden:

@@ -128,7 +128,16 @@ async def _can_appeal(member):
 
 
 async def _create_thread(
-    bot, channel, creator, recipient, is_mention=False, content=None, is_mod=False, ban_appeal=False, message=None
+    bot,
+    channel,
+    creator,
+    recipient,
+    is_mention=False,
+    content=None,
+    is_mod=False,
+    ban_appeal=False,
+    messsage=None,
+    created_at=None,
 ):
     db = mclient.modmail.logs
     initial_message = None
@@ -151,6 +160,7 @@ async def _create_thread(
         }
 
         _id = str(message.id) + '-' + str(int(time.time()))
+        created_at = str(message.created_at)
 
     else:
         _id = str(channel.id) + '-' + str(int(time.time()))
@@ -160,7 +170,7 @@ async def _create_thread(
             '_id': _id,
             'key': _id,
             'open': True,
-            'created_at': str(message.created_at),
+            'created_at': created_at,
             'closed_at': None,
             'channel_id': str(channel.id),
             'guild_id': str(channel.guild.id),
@@ -345,7 +355,7 @@ async def _trigger_create_user_thread(
     return channel
 
 
-async def _trigger_create_mod_thread(self, bot, guild, member, moderator, anonymous):
+async def _trigger_create_mod_thread(self, bot, guild, member, moderator):
     db = mclient.modmail.logs
     punsDB = mclient.bowser.puns
 
@@ -366,7 +376,9 @@ async def _trigger_create_mod_thread(self, bot, guild, member, moderator, anonym
     embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
-    docID = await _create_thread(bot, channel, moderator, member)
+    docID = await _create_thread(
+        bot, channel, moderator, member, created_at=datetime.datetime.utcnow().isoformat(sep=' ')
+    )  # Since we don't have a reference with slash commands, pull current iso datetime in UTC
 
     punsDB = mclient.bowser.puns
     puns = punsDB.find({'user': member.id, 'active': True})
