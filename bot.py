@@ -251,14 +251,7 @@ class Mail(commands.Cog):
             )
 
         try:
-            await utils._trigger_create_mod_thread(
-                self.bot,
-                member,
-                ctx.message,
-                open_type='moderator',
-                moderator=ctx.author,
-                anonymous=False,
-            )
+            await utils._trigger_create_mod_thread(self.bot, ctx.guild, member, ctx.author)
 
         except discord.Forbidden:
             return
