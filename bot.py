@@ -31,7 +31,11 @@ mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, passw
 intents = discord.Intents(guilds=True, members=True, bans=True, messages=True, typing=True)
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='DM to contact mods')
 bot = commands.Bot(
-    config.command_prefixes, fetch_offline_members=True, activity=activityStatus, case_insensitive=True, intents=intents
+    command_prefix=commands.when_mentioned,
+    fetch_offline_members=True,
+    activity=activityStatus,
+    case_insensitive=True,
+    intents=intents,
 )
 slash = SlashCommand(bot)
 guildList = [config.guild]

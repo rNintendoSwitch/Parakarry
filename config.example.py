@@ -2,7 +2,6 @@
 
 # Discord.py
 token = 'token'
-command_prefixes = ['!', ',', 'p']
 
 # Mongo Credentials
 mongoUser = 'user'
