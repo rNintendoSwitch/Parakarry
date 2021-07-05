@@ -60,6 +60,7 @@ class Mail(commands.Cog):
         ],
     )
     async def _close(self, ctx: SlashContext, delay: str = None):
+        await ctx.defer()
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True})
 
@@ -111,6 +112,7 @@ class Mail(commands.Cog):
         """
         Reply to an open modmail thread
         """
+        await ctx.defer()
         await self._reply(ctx, content)
 
     @cog_ext.cog_slash(
@@ -131,6 +133,7 @@ class Mail(commands.Cog):
         """
         Reply to an open modmail thread anonymously
         """
+        await ctx.defer()
         await self._reply(ctx, content, True)
 
     async def _reply(self, ctx, content, anonymous=False):
@@ -277,23 +280,33 @@ class Mail(commands.Cog):
 
         doc = db.find_one({'_id': args[0]})
 
-    @commands.has_any_role(config.modRole)
-    @commands.group(name='appeal', case_insensitive=True, invoke_without_command=True)
-    async def _appeal(self, ctx):
-        return await ctx.send_help(self._appeal)
-
-    @commands.has_any_role(config.modRole)
-    @_appeal.command(name='accept')
-    async def _appeal_accept(self, ctx, *, reason):
+    @cog_ext.cog_subcommand(
+        base='appeal',
+        name='accept',
+        guild_ids=guildList,
+        base_description='Make a decision to accept or deny a ban appeal',
+        description='Accept a user\'s ban appeal',
+        base_permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        options=[
+            create_option(
+                name='reason',
+                description='Why are you accepting this appeal?',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            )
+        ],
+    )
+    async def _appeal_accept(self, ctx: SlashContext, *, reason):
+        await ctx.defer()
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
 
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
-        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
         punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
         await ctx.guild.unban(user, reason=f'Ban appeal accepted by {ctx.author}')
@@ -347,15 +360,35 @@ class Mail(commands.Cog):
             except:
                 return
 
-    @commands.has_any_role(config.modRole)
-    @_appeal.command(name='deny')
-    async def _appeal_deny(self, ctx, next_attempt, *, reason):
+    @cog_ext.cog_subcommand(
+        base='appeal',
+        name='deny',
+        guild_ids=guildList,
+        base_description='Make a decision to accept or deny a ban appeal',
+        description='Deny a user\'s ban appeal',
+        base_permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        options=[
+            create_option(
+                name='next_attempt',
+                description='The amount of time until the user can appeal again, in 1w2d3h4m5s format',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+            create_option(
+                name='reason',
+                description='Why are you denying this appeal?',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+        ],
+    )
+    async def _appeal_deny(self, ctx: SlashContext, next_attempt, *, reason):
+        await ctx.defer()
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
 
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
-        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
@@ -365,6 +398,7 @@ class Mail(commands.Cog):
         except KeyError:
             return await ctx.send('Invalid duration')
 
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         docID = str(uuid.uuid4())
         while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())

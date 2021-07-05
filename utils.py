@@ -204,7 +204,7 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
     closeInfo = {
         '$set': {
             'open': False,
-            'closed_at': str(ctx.message.created_at),
+            'closed_at': datetime.datetime.utcnow().isoformat(sep=' '),
             'closer': {
                 'id': str(ctx.author.id),
                 'name': ctx.author.name,
@@ -377,7 +377,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
     docID = await _create_thread(
-        bot, channel, moderator, member, created_at=str(datetime.datetime.utcnow().isoformat(sep=' '))
+        bot, channel, moderator, member, created_at=datetime.datetime.utcnow().isoformat(sep=' ')
     )  # Since we don't have a reference with slash commands, pull current iso datetime in UTC
 
     punsDB = mclient.bowser.puns
