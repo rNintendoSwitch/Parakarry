@@ -39,6 +39,7 @@ bot = commands.Bot(
 )
 slash = SlashCommand(bot)
 guildList = [config.guild]
+modPermissions = {config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]}
 
 
 class Mail(commands.Cog):
@@ -53,7 +54,7 @@ class Mail(commands.Cog):
         name='close',
         guild_ids=guildList,
         description='Closes a modmail thread, optionally with a delay',
-        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        permissions=modPermissions,
         options=[
             create_option(
                 name='delay',
@@ -102,7 +103,7 @@ class Mail(commands.Cog):
         name='reply',
         guild_ids=guildList,
         description='Replys to a modmail, with your username',
-        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        permissions=modPermissions,
         options=[
             create_option(
                 name='content',
@@ -123,7 +124,7 @@ class Mail(commands.Cog):
         name='areply',
         guild_ids=guildList,
         description='Replys to a modmail, anonymously',
-        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        permissions=modPermissions,
         options=[
             create_option(
                 name='content',
@@ -239,7 +240,7 @@ class Mail(commands.Cog):
         name='open',
         guild_ids=guildList,
         description='Open a modmail thread with a user, using your username',
-        permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        permissions=modPermissions,
         options=[
             create_option(
                 name='member',
@@ -290,7 +291,7 @@ class Mail(commands.Cog):
         guild_ids=guildList,
         base_description='Make a decision to accept or deny a ban appeal',
         description='Accept a user\'s ban appeal',
-        base_permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        base_permissions=modPermissions,
         options=[
             create_option(
                 name='reason',
@@ -370,7 +371,7 @@ class Mail(commands.Cog):
         guild_ids=guildList,
         base_description='Make a decision to accept or deny a ban appeal',
         description='Deny a user\'s ban appeal',
-        base_permissions={config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]},
+        base_permissions=modPermissions,
         options=[
             create_option(
                 name='next_attempt',
