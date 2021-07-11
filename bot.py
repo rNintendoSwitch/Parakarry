@@ -3,13 +3,15 @@ import datetime
 import logging
 import re
 import time
-import typing
 import uuid
 from sys import exit
 
 import discord
 import pymongo
 from discord.ext import commands
+from discord_slash import SlashCommand, SlashContext, cog_ext
+from discord_slash.model import SlashCommandOptionType, SlashCommandPermissionType
+from discord_slash.utils.manage_commands import create_option, create_permission
 
 import utils
 
@@ -29,8 +31,15 @@ mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, passw
 intents = discord.Intents(guilds=True, members=True, bans=True, messages=True, typing=True)
 activityStatus = discord.Activity(type=discord.ActivityType.playing, name='DM to contact mods')
 bot = commands.Bot(
-    config.command_prefixes, fetch_offline_members=True, activity=activityStatus, case_insensitive=True, intents=intents
+    command_prefix=commands.when_mentioned,
+    fetch_offline_members=True,
+    activity=activityStatus,
+    case_insensitive=True,
+    intents=intents,
 )
+slash = SlashCommand(bot)
+guildList = [config.guild]
+modPermissions = {config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]}
 
 
 class Mail(commands.Cog):
@@ -38,10 +47,25 @@ class Mail(commands.Cog):
         self.bot = bot
         self.READY = False
         self.closeQueue = {}
+        loop = bot.loop
+        loop.create_task(slash.sync_all_commands(delete_from_unused_guilds=True))
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='close')
-    async def _close(self, ctx, delay: typing.Optional[str]):
+    @cog_ext.cog_slash(
+        name='close',
+        guild_ids=guildList,
+        description='Closes a modmail thread, optionally with a delay',
+        permissions=modPermissions,
+        options=[
+            create_option(
+                name='delay',
+                description='The delay for the modmail to close, in 1w2d3h4m5s format',
+                option_type=SlashCommandOptionType.STRING,
+                required=False,
+            )
+        ],
+    )
+    async def _close(self, ctx: SlashContext, delay: str = None):
+        await ctx.defer()
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True})
 
@@ -75,29 +99,57 @@ class Mail(commands.Cog):
 
         await utils._close_thread(self.bot, ctx, self.modLogs)
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='reply', aliases=['r'])
-    async def _reply_user(self, ctx, *, content: typing.Optional[str]):
+    @cog_ext.cog_slash(
+        name='reply',
+        guild_ids=guildList,
+        description='Replys to a modmail, with your username',
+        permissions=modPermissions,
+        options=[
+            create_option(
+                name='content',
+                description='The message to send to the user',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            )
+        ],
+    )
+    async def _reply_user(self, ctx: SlashContext, *, content):
         """
         Reply to an open modmail thread
         """
+        await ctx.defer()
         await self._reply(ctx, content)
 
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='areply', aliases=['ar'])
-    async def _reply_anon(self, ctx, *, content: typing.Optional[str]):
+    @cog_ext.cog_slash(
+        name='areply',
+        guild_ids=guildList,
+        description='Replys to a modmail, anonymously',
+        permissions=modPermissions,
+        options=[
+            create_option(
+                name='content',
+                description='The message to send to the user',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            )
+        ],
+    )
+    async def _reply_anon(self, ctx: SlashContext, *, content):
         """
         Reply to an open modmail thread anonymously
         """
+        await ctx.defer()
         await self._reply(ctx, content, True)
 
     async def _reply(self, ctx, content, anonymous=False):
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(ctx.channel.id)})
-        attachments = [x.url for x in ctx.message.attachments]
+        # Attachments are unable to be sent mod -> user with slash commands (unless it's a url).
+        #
+        # attachments = [x.url for x in ctx.message.attachments]
 
-        if not content and not attachments:
-            return await ctx.send('You must provide reply content, attachments, or both to use this command')
+        # if not content and not attachments:
+        #    return await ctx.send('You must provide reply content, attachments, or both to use this command')
 
         if ctx.channel.category_id != config.category or not doc:  # No thread in channel, or not in modmail category
             return await ctx.send('Cannot send a reply here, this is not a modmail channel!')
@@ -129,35 +181,13 @@ class Mail(commands.Cog):
             await member.send(
                 f'Reply from **{"Moderator" if anonymous else ctx.author}**: {content if content else ""}'
             )
-            if attachments:
-                await member.send('\n'.join(attachments))
+            # if attachments:
+            #    await member.send('\n'.join(attachments))
 
         except:
             return await ctx.send(
                 'There was an issue replying to this user, they may have left the server or disabled DMs'
             )
-
-        db.update_one(
-            {'_id': doc['_id']},
-            {
-                '$push': {
-                    'messages': {
-                        'timestamp': str(ctx.message.created_at),
-                        'message_id': str(ctx.message.id),
-                        'content': content if content else '',
-                        'type': 'thread_message' if not anonymous else 'anonymous',
-                        'author': {
-                            'id': str(ctx.author.id),
-                            'name': ctx.author.name,
-                            'discriminator': ctx.author.discriminator,
-                            'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
-                            'mod': True,
-                        },
-                        'attachments': attachments,
-                    }
-                }
-            },
-        )
 
         embed = discord.Embed(title='Moderator message', description=content, color=0x7ED321)
         if not anonymous:
@@ -170,68 +200,68 @@ class Mail(commands.Cog):
                 icon_url='https://cdn.mattbsg.xyz/rns/snoo.png',
             )
 
-        if len(attachments) > 1:  # More than one attachment, use fields
-            for x in range(len(attachments)):
-                embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
+        #        if len(attachments) > 1:  # More than one attachment, use fields
+        #            for x in range(len(attachments)):
+        #                embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
+        #
+        #        elif attachments and re.search(
+        #            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+        #        ):  # One attachment, image
+        #            embed.set_image(url=attachments[0])
+        #
+        #        elif attachments:  # Still have an attachment, but not an image
+        #            embed.add_field(name=f'Attachment', value=attachments[0])
 
-        elif attachments and re.search(
-            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
-        ):  # One attachment, image
-            embed.set_image(url=attachments[0])
+        mailMsg = await ctx.send(embed=embed)
 
-        elif attachments:  # Still have an attachment, but not an image
-            embed.add_field(name=f'Attachment', value=attachments[0])
+        db.update_one(
+            {'_id': doc['_id']},
+            {
+                '$push': {
+                    'messages': {
+                        'timestamp': str(datetime.datetime.utcnow().isoformat(sep=' ')),
+                        'message_id': str(mailMsg.id),
+                        'content': content if content else '',
+                        'type': 'thread_message' if not anonymous else 'anonymous',
+                        'author': {
+                            'id': str(ctx.author.id),
+                            'name': ctx.author.name,
+                            'discriminator': ctx.author.discriminator,
+                            'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
+                            'mod': True,
+                        }  # ,
+                        #'attachments': attachments,
+                    }
+                }
+            },
+        )
 
-        await ctx.send(embed=embed)
-
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='open')
-    async def _open_thread(self, ctx, member: discord.Member, *, content):
+    @cog_ext.cog_slash(
+        name='open',
+        guild_ids=guildList,
+        description='Open a modmail thread with a user, using your username',
+        permissions=modPermissions,
+        options=[
+            create_option(
+                name='member',
+                description='The user to start a thread with',
+                option_type=SlashCommandOptionType.USER,
+                required=True,
+            )
+        ],
+    )
+    async def _open_thread(self, ctx: SlashContext, member):
         """
         Open a modmail thread with a user
         """
+        await ctx.defer()
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
             return await ctx.send(
                 ':x: Unable to open modmail to user -- there is already a thread involving them currently open'
             )
 
         try:
-            await utils._trigger_create_thread(
-                self.bot,
-                member,
-                ctx.message,
-                open_type='moderator',
-                moderator=ctx.author,
-                content=content,
-                anonymous=False,
-            )
-
-        except discord.Forbidden:
-            return
-
-        await ctx.send(f':white_check_mark: Modmail has been opened with {member}')
-
-    @commands.has_any_role(config.modRole)
-    @commands.command(name='aopen')
-    async def _open_thread_anon(self, ctx, member: discord.Member, *, content):
-        """
-        Open a modmail thread with a user anonymously
-        """
-        if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
-            return await ctx.send(
-                ':x: Unable to open modmail to user -- there is already a thread involving them currently open'
-            )
-
-        try:
-            await utils._trigger_create_thread(
-                self.bot,
-                member,
-                ctx.message,
-                open_type='moderator',
-                moderator=ctx.author,
-                content=content,
-                anonymous=True,
-            )
+            await utils._trigger_create_mod_thread(self.bot, ctx.guild, member, ctx.author)
 
         except discord.Forbidden:
             return
@@ -255,23 +285,33 @@ class Mail(commands.Cog):
 
         doc = db.find_one({'_id': args[0]})
 
-    @commands.has_any_role(config.modRole)
-    @commands.group(name='appeal', case_insensitive=True, invoke_without_command=True)
-    async def _appeal(self, ctx):
-        return await ctx.send_help(self._appeal)
-
-    @commands.has_any_role(config.modRole)
-    @_appeal.command(name='accept')
-    async def _appeal_accept(self, ctx, *, reason):
+    @cog_ext.cog_subcommand(
+        base='appeal',
+        name='accept',
+        guild_ids=guildList,
+        base_description='Make a decision to accept or deny a ban appeal',
+        description='Accept a user\'s ban appeal',
+        base_permissions=modPermissions,
+        options=[
+            create_option(
+                name='reason',
+                description='Why are you accepting this appeal?',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            )
+        ],
+    )
+    async def _appeal_accept(self, ctx: SlashContext, *, reason):
+        await ctx.defer()
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
 
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
-        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
         punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
         await ctx.guild.unban(user, reason=f'Ban appeal accepted by {ctx.author}')
@@ -325,15 +365,35 @@ class Mail(commands.Cog):
             except:
                 return
 
-    @commands.has_any_role(config.modRole)
-    @_appeal.command(name='deny')
-    async def _appeal_deny(self, ctx, next_attempt, *, reason):
+    @cog_ext.cog_subcommand(
+        base='appeal',
+        name='deny',
+        guild_ids=guildList,
+        base_description='Make a decision to accept or deny a ban appeal',
+        description='Deny a user\'s ban appeal',
+        base_permissions=modPermissions,
+        options=[
+            create_option(
+                name='next_attempt',
+                description='The amount of time until the user can appeal again, in 1w2d3h4m5s format',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+            create_option(
+                name='reason',
+                description='Why are you denying this appeal?',
+                option_type=SlashCommandOptionType.STRING,
+                required=True,
+            ),
+        ],
+    )
+    async def _appeal_deny(self, ctx: SlashContext, next_attempt, *, reason):
+        await ctx.defer()
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
 
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True, 'ban_appeal': True})
-        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
@@ -343,6 +403,7 @@ class Mail(commands.Cog):
         except KeyError:
             return await ctx.send('Invalid duration')
 
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         docID = str(uuid.uuid4())
         while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
@@ -553,10 +614,10 @@ class Mail(commands.Cog):
 
             else:
                 try:
-                    thread = await utils._trigger_create_thread(self.bot, message.author, message, 'user')
+                    thread = await utils._trigger_create_user_thread(self.bot, message.author, message, 'user')
                 except RuntimeError as e:
                     logging.critical(
-                        f'Exception thrown when calling utils._trigger_create_thread() with user {message.author.id}: %s',
+                        f'Exception thrown when calling utils._trigger_create_user_thread() with user {message.author.id}: %s',
                         e,
                     )
                     return

@@ -128,18 +128,49 @@ async def _can_appeal(member):
 
 
 async def _create_thread(
-    bot, channel, message, creator, recipient, is_mention, content=None, is_mod=False, ban_appeal=False
+    bot,
+    channel,
+    creator,
+    recipient,
+    is_mention=False,
+    content=None,
+    is_mod=False,
+    ban_appeal=False,
+    message=None,
+    created_at=None,
 ):
     db = mclient.modmail.logs
-    _id = str(message.id) + '-' + str(int(time.time()))
-    attachments = [x.url for x in message.attachments]
+    initial_message = None
+    if message:
+        attachments = [x.url for x in message.attachments]
+        initial_message = {
+            'timestamp': str(message.created_at),
+            'message_id': str(message.id),
+            'content': message.content if not content else content,
+            'type': 'mention' if is_mention else 'thread_message',
+            'author': {
+                'id': str(message.author.id),
+                'name': message.author.name,
+                'discriminator': message.author.discriminator,
+                'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                'mod': is_mod,
+            },
+            'attachments': attachments,
+            'channel': {'id': str(message.channel.id), 'name': message.channel.name} if is_mention else {},
+        }
+
+        _id = str(message.id) + '-' + str(int(time.time()))
+        created_at = str(message.created_at)
+
+    else:
+        _id = str(channel.id) + '-' + str(int(time.time()))
 
     db.insert_one(
         {
             '_id': _id,
             'key': _id,
             'open': True,
-            'created_at': str(message.created_at),
+            'created_at': created_at,
             'closed_at': None,
             'channel_id': str(channel.id),
             'guild_id': str(channel.guild.id),
@@ -160,23 +191,7 @@ async def _create_thread(
                 'mod': False,
             },
             'closer': None,
-            'messages': [
-                {
-                    'timestamp': str(message.created_at),
-                    'message_id': str(message.id),
-                    'content': message.content if not content else content,
-                    'type': 'mention' if is_mention else 'thread_message',
-                    'author': {
-                        'id': str(message.author.id),
-                        'name': message.author.name,
-                        'discriminator': message.author.discriminator,
-                        'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
-                        'mod': is_mod,
-                    },
-                    'attachments': attachments,
-                    'channel': {'id': str(message.channel.id), 'name': message.channel.name} if is_mention else {},
-                }
-            ],
+            'messages': [] if not initial_message else [initial_message],
         }
     )
 
@@ -189,7 +204,7 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
     closeInfo = {
         '$set': {
             'open': False,
-            'closed_at': str(ctx.message.created_at),
+            'closed_at': datetime.datetime.utcnow().isoformat(sep=' '),
             'closer': {
                 'id': str(ctx.author.id),
                 'name': ctx.author.name,
@@ -231,7 +246,7 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
     await target_channel.send(embed=embed)
 
 
-async def _trigger_create_thread(
+async def _trigger_create_user_thread(
     bot, member, message, open_type, is_mention=False, moderator=None, content=None, anonymous=True
 ):
     db = mclient.modmail.logs
@@ -289,13 +304,13 @@ async def _trigger_create_thread(
     docID = await _create_thread(
         bot,
         channel,
-        message,
         member if not moderator else moderator,
         member,
         is_mention,
         content=None if not content else content,
         is_mod=True if moderator else False,
         ban_appeal=banAppeal,
+        message=message,
     )
 
     punsDB = mclient.bowser.puns
@@ -332,58 +347,81 @@ async def _trigger_create_thread(
             f'Hi there!\nYou have submitted a ban appeal to the chat moderators who oversee the **{guild.name}** Discord.\n\nI will send you a message when a moderator responds to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅.\n\nPlease be patient for a response; the moderation team will have active discussions about the appeal and may take some time to reply. We ask that you be civil and respectful during this process so constructive conversation can be had in both directions. At the end of this process, moderators will either lift or uphold your ban -- you will receive an official message stating the final decision.'
         )
 
-    elif open_type == 'moderator':
-        try:
-            attachments = [x.url for x in message.attachments]
-            await member.send(
-                f'Hi there!\nThe chat moderators who oversee the **{guild.name}** Discord have opened a modmail with you!\n\nI will send you a message when a moderator responds to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅.'
-            )
-            await member.send(
-                f'Message from **{"Moderator" if anonymous else message.author}**: {content if content else ""}'
-            )
-            if attachments:
-                await member.send('\n'.join(attachments))
-
-            embed = discord.Embed(title='Moderator message', description=content, color=0x7ED321)
-            if not anonymous:
-                embed.set_author(name=f'{moderator} ({moderator.id})', icon_url=moderator.avatar_url)
-
-            else:
-                embed.title = '[ANON] Moderator message'
-                embed.set_author(
-                    name=f'{moderator} ({moderator.id}) as r/NintendoSwitch',
-                    icon_url='https://cdn.mattbsg.xyz/rns/snoo.png',
-                )
-
-            if len(attachments) > 1:  # More than one attachment, use fields
-                for x in range(len(attachments)):
-                    embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
-
-            elif attachments and re.search(
-                r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
-            ):  # One attachment, image
-                embed.set_image(url=attachments[0])
-
-            elif attachments:  # Still have an attachment, but not an image
-                embed.add_field(name=f'Attachment', value=attachments[0])
-
-            await channel.send(embed=embed)
-
-        except discord.Forbidden:
-            # Cleanup if there really was an issue messaging the user, i.e. bot blocked
-            db.delete_one({'_id': docID})
-            await channel.delete()
-            await bot.get_channel(config.adminChannel).send(
-                f'Failed to DM {member.mention} for modmail thread created by {moderator.mention}. Thread open action canceled'
-            )
-            raise
-
     else:
         await member.send(
             f'Hi there!\nYou have opened a modmail thread with the chat moderators who oversee the **{guild.name}** Discord and they have received your message.\n\nI will send you a message when moderators respond to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅. \n\nPlease be patient for a response; if this is an urgent issue you may also ping the Chat-Mods with @Chat-Mods in a channel'
         )
 
     return channel
+
+
+async def _trigger_create_mod_thread(bot, guild, member, moderator):
+    db = mclient.modmail.logs
+    punsDB = mclient.bowser.puns
+
+    guild = bot.get_guild(config.guild)
+    appealGuild = bot.get_guild(config.appealGuild)
+    try:
+        await guild.fetch_member(member.id)
+
+    except discord.NotFound:
+        raise RuntimeError('Invalid user')  # TODO: We need custom exceptions
+
+    category = guild.get_channel(config.category)
+    channelName = f'{member.name}-{member.discriminator}'
+    channel = await category.create_text_channel(channelName, reason='New modmail opened')
+
+    embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
+
+    embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+
+    threadCount = db.count_documents({'recipient.id': str(member.id)})
+    docID = await _create_thread(
+        bot, channel, moderator, member, created_at=datetime.datetime.utcnow().isoformat(sep=' ')
+    )  # Since we don't have a reference with slash commands, pull current iso datetime in UTC
+
+    punsDB = mclient.bowser.puns
+    puns = punsDB.find({'user': member.id, 'active': True})
+    punsCnt = punsDB.count_documents({'user': member.id, 'active': True})
+
+    description = f'A modmail thread has been opened with {member} ({member.mention}) by {moderator} ({moderator.mention}). There are {threadCount} previous threads involving this user'
+    description += f'. Archive link: {config.logUrl}{docID}'
+
+    if punsCnt:
+        description += '\n\n__User has active punishments:__\n'
+        for pun in puns:
+            timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
+            if pun['type'] == 'strike':
+                description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+
+            else:
+                description += (
+                    f"**{punNames[pun['type']]}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
+                )
+
+    embed.description = description
+    mailMsg = await channel.send(embed=embed)
+    await _info(await bot.get_context(mailMsg), bot, await guild.fetch_member(member.id))
+    try:
+        await member.send(
+            f'Hi there!\nThe chat moderators who oversee the **{guild.name}** Discord have opened a modmail with you!\n\nI will send you a message when a moderator responds to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅.'
+        )
+
+    except discord.Forbidden:
+        # Cleanup if there really was an issue messaging the user, i.e. bot blocked
+        db.delete_one({'_id': docID})
+        await channel.delete()
+        await bot.get_channel(config.adminChannel).send(
+            f'Failed to DM {member.mention} for modmail thread created by {moderator.mention}. Thread open action canceled'
+        )
+        raise
+
+    embed = discord.Embed(
+        title='Thread is open',
+        description='This thread is now open to moderator and user replies. Start the conversation by using `/reply` or `/areply`',
+        color=0x58B9FF,
+    )
+    await channel.send(embed=embed)
 
 
 async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
