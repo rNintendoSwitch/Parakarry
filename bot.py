@@ -147,7 +147,8 @@ class Mail(commands.Cog):
         # Attachments are unable to be sent mod -> user with slash commands (unless it's a url).
         #
         # attachments = [x.url for x in ctx.message.attachments]
-
+        # TODO: If ever able, reenable this functionality
+        attachments = []
         # if not content and not attachments:
         #    return await ctx.send('You must provide reply content, attachments, or both to use this command')
 
@@ -229,8 +230,8 @@ class Mail(commands.Cog):
                             'discriminator': ctx.author.discriminator,
                             'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
                             'mod': True,
-                        }  # ,
-                        #'attachments': attachments,
+                        },
+                        'attachments': attachments,
                     }
                 }
             },
