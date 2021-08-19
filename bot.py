@@ -3,6 +3,7 @@ import datetime
 import logging
 import re
 import time
+import typing
 import uuid
 from sys import exit
 
@@ -64,8 +65,10 @@ class Mail(commands.Cog):
             )
         ],
     )
-    async def _close(self, ctx: SlashContext, delay: str = None):
-        await ctx.defer()
+    async def _close(self, ctx: typing.Union[SlashContext, commands.Context], delay: str = None):
+        if isinstance(ctx, SlashContext):
+            await ctx.defer()
+
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(ctx.channel.id), 'open': True})
 
@@ -503,7 +506,7 @@ class Mail(commands.Cog):
             )
             if not thread['ban_appeal']:
                 ctx = await self.bot.get_context(message)
-                await self._close.__call__(ctx, None)
+                await self._close.invoke(ctx, None)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -549,7 +552,7 @@ class Mail(commands.Cog):
             )
             if not thread['ban_appeal']:
                 ctx = await self.bot.get_context(message)
-                await self._close.__call__(ctx, '4h')
+                await self._close.invoke(ctx, '4h')
 
     @commands.Cog.listener()
     async def on_message(self, message):
