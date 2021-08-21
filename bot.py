@@ -443,12 +443,12 @@ class Mail(commands.Cog):
 
         except:
             await self.bot.get_channel(config.adminChannel).send(
-                f':warning: The ban appeal for {user} has been denied by {ctx.author}, but I was unable to DM them the decision'
+                f':warning: The ban appeal for {user} has been denied by {ctx.author} until {delayDate.strftime("%B %d, %Y at %I:%M%p UTC")}, but I was unable to DM them the decision'
             )
 
         else:
             await self.bot.get_channel(config.adminChannel).send(
-                f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author}'
+                f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author} until {delayDate.strftime("%B %d, %Y at %I:%M%p UTC")}'
             )
 
         finally:
