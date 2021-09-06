@@ -117,7 +117,7 @@ async def _can_appeal(member):
             try:
                 expiry = datetime.datetime.fromtimestamp(pun['expiry'])
                 await member.send(
-                    f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {humanize_duration(expiry)})__ to submit a new appeal with the following invite link: {config.appealInvite}'
+                    f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {humanize_duration(expiry)})__ to submit a new appeal with the following invite link: {config.appealInvite}\n\nReason given by moderators:\n```{pun["reason"]}```'
                 )
 
             finally:
