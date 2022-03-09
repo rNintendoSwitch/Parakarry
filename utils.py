@@ -534,13 +534,18 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
         puns = 0
         activeStrikes = 0
         totalStrikes = 0
+        activeMute = None
         for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
             if pun['type'] == 'strike':
                 totalStrikes += pun['strike_count']
                 activeStrikes += pun['active_strike_count']
 
-            if pun['type'] == 'destrike':
+            elif pun['type'] == 'destrike':
                 totalStrikes -= pun['strike_count']
+
+            elif pun['type'] == 'mute':
+                if pun['active']:
+                    activeMute = pun['expiry']
 
             if puns >= 5:
                 continue
@@ -568,11 +573,11 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
             f'\n```diff\n{punishments}```'
         )
 
+        if activeMute:
+            embed.description += f'\n**User is currently muted until <t:{activeMute}:f>**'
+
         if totalStrikes:
-            embed.description = (
-                embed.description
-                + f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes > 1 or activeStrikes < 1 else ""} ({totalStrikes} in total)'
-            )
+            embed.description += f'\nUser currently has {activeStrikes} active strike{"s" if activeStrikes != 1 else ""} ({totalStrikes} in total)'
 
     embed.add_field(name='Punishments', value=punishments, inline=False)
     return await ctx.send(embed=embed)
