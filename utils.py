@@ -555,9 +555,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
                 punishments += f'> {config.removeTick} {stamp} **{punType}**\n'
 
             elif pun['type'] == 'strike':
-                punishments += (
-                    f'+ [{stamp}] {punType.format(pun["strike_count"], "s" if pun["strike_count"] > 1 else "")}\n'
-                )
+                punishments += f'> {config.addTick} {stamp} **{punType.format(pun["strike_count"], "s" if pun["strike_count"] > 1 else "")}**\n'
 
             else:
                 punishments += f'> {config.addTick} {stamp} **{punType}**\n'
