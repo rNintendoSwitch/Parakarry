@@ -98,7 +98,7 @@ class Mail(commands.Cog):
                 delayTime, event_loop.create_task, utils._close_thread(self.bot, ctx, self.modLogs)
             )
             self.closeQueue[doc['_id']] = close_action
-            return await ctx.send('Thread scheduled to be closed in ' + utils.humanize_duration(delayDate))
+            return await ctx.send(f'Thread scheduled to be closed in <t:{int(delayDate.timestamp())}:R>')
 
         await utils._close_thread(self.bot, ctx, self.modLogs)
 
@@ -415,23 +415,23 @@ class Mail(commands.Cog):
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Next appeal in', value=utils.humanize_duration(delayDate))
+        embed.add_field(name='Next appeal in', value=f'<t:{int(delayDate.timestamp())}:R>')
         embed.add_field(name='Reason', value=reason)
         await self.modLogs.send(embed=embed)
 
         try:
             await user.send(
-                f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __{delayDate.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(delayDate)})__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
+                f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __<t:{int(delayDate.timestamp())}:f> (approximately <t:{int(delayDate.timestamp())}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
             )
 
         except:
             await self.bot.get_channel(config.adminChannel).send(
-                f':warning: The ban appeal for {user} has been denied by {ctx.author} until {delayDate.strftime("%B %d, %Y at %I:%M%p UTC")}, but I was unable to DM them the decision'
+                f':warning: The ban appeal for {user} has been denied by {ctx.author} until <t:{int(delayDate.timestamp())}:f>, but I was unable to DM them the decision'
             )
 
         else:
             await self.bot.get_channel(config.adminChannel).send(
-                f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author} until {delayDate.strftime("%B %d, %Y at %I:%M%p UTC")}'
+                f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author} until <t:{int(delayDate.timestamp())}:f>'
             )
 
         finally:
