@@ -1,7 +1,6 @@
-import datetime
-import re
 import time
 import typing
+from datetime import datetime, timedelta, timezone
 
 import config
 import discord
@@ -64,7 +63,7 @@ def resolve_duration(data):
         value += timeUnits[char](int(digits))
         digits = ''
 
-    return datetime.datetime.utcnow() + datetime.timedelta(seconds=value + 1)
+    return datetime.now(tz=timezone.utc) + timedelta(seconds=value + 1)
 
 
 def humanize_duration(duration):
@@ -75,12 +74,12 @@ def humanize_duration(duration):
 
     duration: datetime.datetime
     """
-    now = datetime.datetime.utcnow()
-    if isinstance(duration, datetime.timedelta):
+    now = datetime.now(tz=timezone.utc)
+    if isinstance(duration, timedelta):
         if duration.total_seconds() > 0:
-            duration = datetime.datetime.today() + duration
+            duration = datetime.today() + duration
         else:
-            duration = datetime.datetime.utcnow() - datetime.timedelta(seconds=duration.total_seconds())
+            duration = datetime.now(tz=timezone.utc) - timedelta(seconds=duration.total_seconds())
     diff_delta = duration - now
     diff = int(diff_delta.total_seconds())
 
@@ -113,9 +112,9 @@ async def _can_appeal(member):
     db = mclient.bowser.puns
     pun = db.find_one({'user': member.id, 'type': 'appealdeny', 'active': True})
     if pun:
-        if pun['expiry'] > datetime.datetime.utcnow().timestamp():
+        if pun['expiry'] > datetime.now(tz=timezone.utc).timestamp():
             try:
-                expiry = datetime.datetime.fromtimestamp(pun['expiry'])
+                expiry = datetime.fromtimestamp(pun['expiry'], tz=timezone.utc)
                 await member.send(
                     f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __<t:{int(expiry.timestamp())}:f> (approximately <t:{int(expiry.timestamp())}:R>)__ to submit a new appeal with the following invite link: {config.appealInvite}\n\nReason given by moderators:\n```{pun["reason"]}```'
                 )
@@ -204,7 +203,7 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
     closeInfo = {
         '$set': {
             'open': False,
-            'closed_at': datetime.datetime.utcnow().isoformat(sep=' '),
+            'closed_at': datetime.now(tz=timezone.utc).isoformat(sep=' '),
             'closer': {
                 'id': str(ctx.author.id),
                 'name': ctx.author.name,
@@ -239,7 +238,9 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
 
     user = doc['recipient']
 
-    embed = discord.Embed(description=config.logUrl + doc['_id'], color=0xB8E986, timestamp=datetime.datetime.utcnow())
+    embed = discord.Embed(
+        description=config.logUrl + doc['_id'], color=0xB8E986, timestamp=datetime.now(tz=timezone.utc)
+    )
     embed.set_author(name=f'Modmail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
     embed.add_field(name='User', value=f'<@{user["id"]}>', inline=True)
     embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
@@ -377,7 +378,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
     docID = await _create_thread(
-        bot, channel, moderator, member, created_at=datetime.datetime.utcnow().isoformat(sep=' ')
+        bot, channel, moderator, member, created_at=datetime.now(tz=timezone.utc).isoformat(sep=' ')
     )  # Since we don't have a reference with slash commands, pull current iso datetime in UTC
 
     punsDB = mclient.bowser.puns

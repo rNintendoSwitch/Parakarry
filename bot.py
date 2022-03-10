@@ -1,10 +1,10 @@
 import asyncio
-import datetime
 import logging
 import re
 import time
 import typing
 import uuid
+from datetime import datetime, timezone
 from sys import exit
 
 import discord
@@ -88,7 +88,7 @@ class Mail(commands.Cog):
         if delay:
             try:
                 delayDate = utils.resolve_duration(delay)
-                delayTime = delayDate.timestamp() - datetime.datetime.utcnow().timestamp()
+                delayTime = delayDate.timestamp() - datetime.now(tz=timezone.utc).timestamp()
 
             except KeyError:
                 return await ctx.send('Invalid duration')
@@ -223,7 +223,7 @@ class Mail(commands.Cog):
             {
                 '$push': {
                     'messages': {
-                        'timestamp': str(datetime.datetime.utcnow().isoformat(sep=' ')),
+                        'timestamp': str(datetime.now(tz=timezone.utc).isoformat(sep=' ')),
                         'message_id': str(mailMsg.id),
                         'content': content if content else '',
                         'type': 'thread_message' if not anonymous else 'anonymous',
@@ -320,7 +320,7 @@ class Mail(commands.Cog):
             }
         )
 
-        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
         embed.set_author(name=f'Ban appeal accepted | {user}')
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
@@ -410,7 +410,7 @@ class Mail(commands.Cog):
             }
         )
 
-        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.datetime.utcnow())
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
         embed.set_author(name=f'Ban appeal denied | {user}')
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
