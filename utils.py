@@ -330,7 +330,7 @@ async def _trigger_create_user_thread(
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
         for pun in puns:
-            timestamp = f'<t:{int(pun["timestamp"].timestamp())}:f>'
+            timestamp = f'<t:{int(pun["timestamp"])}:f>'
             if pun['type'] == 'strike':
                 description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
@@ -391,7 +391,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
         for pun in puns:
-            timestamp = f'<t:{int(pun["timestamp"].timestamp())}:f>'
+            timestamp = f'<t:{int(pun["timestamp"])}:f>'
             if pun['type'] == 'strike':
                 description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
