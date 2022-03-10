@@ -98,7 +98,7 @@ class Mail(commands.Cog):
                 delayTime, event_loop.create_task, utils._close_thread(self.bot, ctx, self.modLogs)
             )
             self.closeQueue[doc['_id']] = close_action
-            return await ctx.send('Thread scheduled to be closed in ' + utils.humanize_duration(delayDate))
+            return await ctx.send(f'Thread scheduled to be closed in <t:{int(delayDate.timestamp())}:R>')
 
         await utils._close_thread(self.bot, ctx, self.modLogs)
 
@@ -415,7 +415,7 @@ class Mail(commands.Cog):
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
-        embed.add_field(name='Next appeal in', value=utils.humanize_duration(delayDate))
+        embed.add_field(name='Next appeal in', value=f'<t:{int(delayDate.timestamp())}:R>')
         embed.add_field(name='Reason', value=reason)
         await self.modLogs.send(embed=embed)
 
