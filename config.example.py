@@ -22,6 +22,10 @@ appealGuild: int = ban_appeal_guild_id
 # Role ID
 modRole: int = moderator_role_id
 
+# Emoji ID
+addTick = '<:addTickL:951241243604713492>'
+removeTick = '<:removeTickL:951249921862926367>'
+
 # URLs
 logUrl = 'https://example.com/logs/'
 appealInvite = 'https://discord.gg/invite'
