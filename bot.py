@@ -421,17 +421,17 @@ class Mail(commands.Cog):
 
         try:
             await user.send(
-                f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __{delayDate.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {utils.humanize_duration(delayDate)})__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
+                f'The moderators have decided to **uphold your ban** on the {ctx.guild} Discord and your ban appeal thread has been closed. You may appeal again after __<t:{int(delayDate.timestamp())}:f> (approximately <t:{int(delayDate.timestamp())}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
             )
 
         except:
             await self.bot.get_channel(config.adminChannel).send(
-                f':warning: The ban appeal for {user} has been denied by {ctx.author} until {delayDate.strftime("%B %d, %Y at %I:%M%p UTC")}, but I was unable to DM them the decision'
+                f':warning: The ban appeal for {user} has been denied by {ctx.author} until <t:{int(delayDate.timestamp())}:f>, but I was unable to DM them the decision'
             )
 
         else:
             await self.bot.get_channel(config.adminChannel).send(
-                f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author} until {delayDate.strftime("%B %d, %Y at %I:%M%p UTC")}'
+                f':white_check_mark: The ban appeal for {user} has been denied by {ctx.author} until <t:{int(delayDate.timestamp())}:f>'
             )
 
         finally:

@@ -117,7 +117,7 @@ async def _can_appeal(member):
             try:
                 expiry = datetime.datetime.fromtimestamp(pun['expiry'])
                 await member.send(
-                    f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __{expiry.strftime("%B %d, %Y at %I:%M%p UTC")} (approximately {humanize_duration(expiry)})__ to submit a new appeal with the following invite link: {config.appealInvite}\n\nReason given by moderators:\n```{pun["reason"]}```'
+                    f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __<t:{int(expiry.timestamp())}:f> (approximately <t:{int(expiry.timestamp())}:R>)__ to submit a new appeal with the following invite link: {config.appealInvite}\n\nReason given by moderators:\n```{pun["reason"]}```'
                 )
 
             finally:
@@ -329,7 +329,7 @@ async def _trigger_create_user_thread(
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
         for pun in puns:
-            timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
+            timestamp = f'<t:{int(pun["timestamp"].timestamp())}:f>'
             if pun['type'] == 'strike':
                 description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
@@ -390,7 +390,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
         for pun in puns:
-            timestamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%b %d, %y at %H:%M UTC')
+            timestamp = f'<t:{int(pun["timestamp"].timestamp())}:f>'
             if pun['type'] == 'strike':
                 description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
 
@@ -440,7 +440,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
             )
             embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
             embed.set_thumbnail(url=user.avatar_url)
-            embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'))
+            embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>')
             return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
 
     else:
@@ -463,7 +463,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     embed.set_thumbnail(url=user.avatar_url)
     embed.add_field(name='Messages', value=str(msgCount), inline=True)
     if inServer:
-        embed.add_field(name='Join date', value=user.joined_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+        embed.add_field(name='Join date', value=f'<t:{int(user.created_at.timestamp())}:f>', inline=True)
 
     roleList = []
     if inServer:
@@ -494,15 +494,9 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
     embed.add_field(name='Roles', value=roles, inline=False)
 
-    lastMsg = (
-        'N/a'
-        if msgCount == 0
-        else datetime.datetime.utcfromtimestamp(
-            messages.sort('timestamp', pymongo.DESCENDING)[0]['timestamp']
-        ).strftime('%B %d, %Y %H:%M:%S UTC')
-    )
+    lastMsg = 'N/a' if msgCount == 0 else f'<t:{int(messages.sort("timestamp", pymongo.DESCENDING)[0]["timestamp"])}:f>'
     embed.add_field(name='Last message', value=lastMsg, inline=True)
-    embed.add_field(name='Created', value=user.created_at.strftime('%B %d, %Y %H:%M:%S UTC'), inline=True)
+    embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>', inline=True)
 
     noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
     noteCnt = mclient.bowser.puns.count_documents({'user': user.id, 'type': 'note'})
@@ -510,7 +504,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     if noteCnt:
         noteList = []
         for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
-            stamp = datetime.datetime.utcfromtimestamp(x['timestamp']).strftime('`[%m/%d/%y]`')
+            stamp = f'[<t:{int(x["timestamp"])}:d>]'
             noteContent = f'{stamp}: {x["reason"]}'
 
             fieldLength = 0
@@ -551,13 +545,13 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
                 continue
 
             puns += 1
-            stamp = datetime.datetime.utcfromtimestamp(pun['timestamp']).strftime('%m/%d/%y %H:%M:%S UTC')
+            stamp = f'<t:{int(pun["timestamp"])}:f>'
             punType = punNames[pun['type']]
             if pun['type'] in ['clear', 'unmute', 'unban', 'unblacklist', 'destrike']:
                 if pun['type'] == 'destrike':
                     punType = f'Removed {pun["strike_count"]} Strike{"s" if pun["strike_count"] > 1 else ""}'
 
-                punishments += f'- [{stamp}] {punType}\n'
+                punishments += f'> {config.removeTick} {stamp} **{punType}**\n'
 
             elif pun['type'] == 'strike':
                 punishments += (
@@ -565,12 +559,12 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
                 )
 
             else:
-                punishments += f'+ [{stamp}] {punType}\n'
+                punishments += f'> {config.addTick} {stamp} **{punType}**\n'
 
         punishments = (
             f'Showing {puns}/{punsCnt} punishment entries. '
             f'For a full history including responsible moderator, active status, and more use `/history {user.id}`'
-            f'\n```diff\n{punishments}```'
+            f'\n\n{punishments}'
         )
 
         if activeMute:
