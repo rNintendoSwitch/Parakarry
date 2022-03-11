@@ -464,7 +464,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     embed.set_thumbnail(url=user.avatar_url)
     embed.add_field(name='Messages', value=str(msgCount), inline=True)
     if inServer:
-        embed.add_field(name='Join date', value=f'<t:{int(user.created_at.timestamp())}:f>', inline=True)
+        embed.add_field(name='Join date', value=f'<t:{int(user.joined_at.timestamp())}:f>', inline=True)
 
     roleList = []
     if inServer:
