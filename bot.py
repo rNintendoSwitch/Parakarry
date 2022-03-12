@@ -544,6 +544,14 @@ class Mail(commands.Cog):
         attachments = [x.url for x in message.attachments]
         ctx = await self.bot.get_context(message)
 
+        # This only works for discord.py 2.0+
+        if message.content:
+            content = message.content
+        elif message.stickers:
+            content = "\n".join([f'*Sent a sticker: {sticker.name}*' for sticker in message.stickers])
+        else:
+            content = '*No message content.*'
+
         # Do something to check category, and add message to log
         if message.channel.type == discord.ChannelType.private:
             # User has sent a DM -- check
@@ -557,7 +565,7 @@ class Mail(commands.Cog):
                         'Thread closure has been canceled because the user has sent a message'
                     )
 
-                description = message.content if message.content else None
+                description = content
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
@@ -584,7 +592,7 @@ class Mail(commands.Cog):
                             'messages': {
                                 'timestamp': str(message.created_at),
                                 'message_id': str(message.id),
-                                'content': message.content,
+                                'content': content,
                                 'type': 'thread_message',
                                 'author': {
                                     'id': str(message.author.id),
@@ -610,9 +618,7 @@ class Mail(commands.Cog):
                     return
 
                 # TODO: Don't duplicate message embed code based on new thread or just new message
-                embed = discord.Embed(
-                    title='New message', description=message.content if message.content else None, color=0x32B6CE
-                )
+                embed = discord.Embed(title='New message', description=content, color=0x32B6CE)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
 
@@ -644,7 +650,7 @@ class Mail(commands.Cog):
                                 'messages': {
                                     'timestamp': str(message.created_at),
                                     'message_id': str(message.id),
-                                    'content': message.content,
+                                    'content': content,
                                     'type': 'internal',
                                     'author': {
                                         'id': str(message.author.id),
