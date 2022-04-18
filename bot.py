@@ -98,7 +98,7 @@ class Mail(commands.Cog):
                 delayTime, event_loop.create_task, utils._close_thread(self.bot, ctx, self.modLogs)
             )
             self.closeQueue[doc['_id']] = close_action
-            return await ctx.send(f'Thread scheduled to be closed in <t:{int(delayDate.timestamp())}:R>')
+            return await ctx.send(f'Thread scheduled to be closed <t:{int(delayDate.timestamp())}:R>')
 
         await utils._close_thread(self.bot, ctx, self.modLogs)
 
