@@ -20,7 +20,9 @@ guild: int = modmail_guild_id
 appealGuild: int = ban_appeal_guild_id
 
 # Role ID
+leadModRole: int = lead_moderator_role_id
 modRole: int = moderator_role_id
+trialModRole: int = trial_moderator_role_id
 
 # Emoji ID
 addTick = '<:addTickL:951241243604713492>'

@@ -40,7 +40,12 @@ bot = commands.Bot(
 )
 slash = SlashCommand(bot)
 guildList = [config.guild]
-modPermissions = {config.guild: [create_permission(config.modRole, SlashCommandPermissionType.ROLE, True)]}
+modPermissions = {
+    config.guild: [
+        create_permission(config.modRole, SlashCommandPermissionType.ROLE, True),
+        create_permission(config.trialModRole, SlashCommandPermissionType.ROLE, True),
+    ]
+}
 
 
 class Mail(commands.Cog):
@@ -182,9 +187,19 @@ class Mail(commands.Cog):
                     return await ctx.send('There was an issue replying to this user, they may have left the server')
 
         try:
-            await member.send(
-                f'Reply from **{"Moderator" if anonymous else ctx.author}**: {content if content else ""}'
-            )
+            if anonymous:
+                responsibleModerator = 'a **Moderator**'
+
+            elif ctx.guild.owner == ctx.author:
+                responsibleModerator = f'*(Server Owner)* **{ctx.author}**'
+
+            elif self.leadModRole in ctx.author.roles:
+                responsibleModerator = f'*(Lead Moderator)* **{ctx.author}**'
+
+            else:
+                responsibleModerator = f'*(Moderator)* **{ctx.author}**'
+
+            await member.send(f'Reply from {responsibleModerator}: {content if content else ""}')
             # if attachments:
             #    await member.send('\n'.join(attachments))
 
@@ -451,6 +466,10 @@ class Mail(commands.Cog):
             self.modLogs = self.bot.get_channel(config.modLog)
             self.bot.remove_command('help')
 
+            self.leadModRole = self.bot.get_guild(config.guild).get_role(config.leadModRole)
+            self.modRole = self.bot.get_guild(config.guild).get_role(config.modRole)
+            self.trialModRole = self.bot.get_guild(config.guild).get_role(config.trialModRole)
+
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.errors.CommandNotFound):
@@ -512,7 +531,11 @@ class Mail(commands.Cog):
 
         except discord.NotFound:
             guildMember = guild.get_member(member.id)
-            if guildMember and guild.get_role(config.modRole) in guildMember.roles:
+            if (
+                guildMember
+                and guild.get_role(config.modRole) in guildMember.roles
+                or guild.get_role(config.trialModRole) in guildMember.roles
+            ):
                 return
 
             await member.send(
