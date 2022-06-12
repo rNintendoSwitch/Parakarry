@@ -562,7 +562,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
         punishments = (
             f'Showing {puns}/{punsCnt} punishment entries. '
-            f'For a full history including responsible moderator, active status, and more use `/history {user.id}`'
+            f'For a full history including responsible moderator, active status, and more use `!history {user.id}`'
             f'\n\n{punishments}'
         )
 
