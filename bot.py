@@ -87,7 +87,7 @@ class Mail(commands.Cog):
             app_info = await self.bot.application_info()
             if ctx.author.id != app_info.owner.id:
                 return await ctx.send(
-                    ':x: Only the bot owner can forcibly close a ban appeal thread. Use `!appeal accept` or `!appeal deny` instead'
+                    ':x: Only the bot owner can forcibly close a ban appeal thread. Use `/appeal accept` or `/appeal deny` instead'
                 )
 
         if delay:
