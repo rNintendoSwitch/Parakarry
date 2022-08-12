@@ -313,6 +313,11 @@ class Mail(commands.Cog):
         if not doc:
             return await ctx.send(':x: This is not a ban appeal channel!')
 
+        if reason and len(reason) > 990:
+            return await ctx.send(
+                f'Wow there, thats a big reason. Please reduce it by at least {len(reason) - 990} characters'
+            )
+
         user = await self.bot.fetch_user(int(doc['recipient']['id']))
         punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
         punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
@@ -404,6 +409,11 @@ class Mail(commands.Cog):
 
         except KeyError:
             return await ctx.send('Invalid duration')
+
+        if reason and len(reason) > 990:
+            return await ctx.send(
+                f'Wow there, thats a big reason. Please reduce it by at least {len(reason) - 990} characters'
+            )
 
         user = await self.bot.fetch_user(int(doc['recipient']['id']))
         docID = str(uuid.uuid4())
