@@ -197,36 +197,38 @@ async def _create_thread(
     return _id
 
 
-async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
+async def _close_thread(bot, mod_user, guild, thread_channel, target_channel, dm=True, reason=None):
     db = mclient.modmail.logs
-    doc = db.find_one({'channel_id': str(ctx.channel.id)})
+    doc = db.find_one({'channel_id': str(thread_channel.id)})
+
     closeInfo = {
         '$set': {
             'open': False,
             'closed_at': datetime.now(tz=timezone.utc).isoformat(sep=' '),
             'closer': {
-                'id': str(ctx.author.id),
-                'name': ctx.author.name,
-                'discriminator': ctx.author.discriminator,
-                'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
+                'id': str(user.id),
+                'name': user.name,
+                'discriminator': user.discriminator,
+                'avatar_url': str(user.interaction.with_static_format(static_format='png').with_size(size=2024)),
                 'mod': True,
             },
         }
     }
+
     if reason:
         closeInfo['$set']['close_message'] = reason
-
     db.update_one({'_id': doc['_id']}, closeInfo)
+
     try:
-        channel = bot.get_channel(ctx.channel.id)
-        await channel.delete(reason=f'Modmail closed by {ctx.author}')
+        channel = bot.get_channel(thread_channel.id)
+        await channel.delete(reason=f'Modmail closed by {user}')
 
     except discord.NotFound:
         pass
 
     if dm:
         try:
-            mailer = await ctx.guild.fetch_member(int(doc['recipient']['id']))
+            mailer = await guild.fetch_member(int(doc['recipient']['id']))
             await mailer.send(
                 '__Your modmail thread has been closed__. If you need to contact the chat-moderators you may send me another DM to open a new modmail thread'
             )
@@ -243,7 +245,7 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
     )
     embed.set_author(name=f'Modmail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
     embed.add_field(name='User', value=f'<@{user["id"]}>', inline=True)
-    embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
+    embed.add_field(name='Moderator', value=f'{mod_user.mention}', inline=True)
     await target_channel.send(embed=embed)
 
 

@@ -1,11 +1,9 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
 from sys import exit
 
 import discord
 import pymongo
-from discord import app_commands
 from discord.ext import commands
 
 
@@ -34,6 +32,7 @@ class Parakarry(commands.Bot):
 
     async def setup_hook(self):
         await self.load_extension('jishaku')
+        await self.load_extension('cogs.modmail')
 
     async def on_ready(self):
         logging.info(f'Parakarry ModMail Bot - Now Logged in as {self.user} ({self.user.id})')
