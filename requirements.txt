@@ -2,4 +2,3 @@ discord.py
 pymongo
 jishaku
 pylint
-discord-py-slash-command
