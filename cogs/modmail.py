@@ -43,7 +43,7 @@ class Mail(commands.Cog):
         message, ephemeral = await self._close_generic(interaction.user, interaction.guild, interaction.channel, delay)
 
         if message:
-            await interaction.response.send_message(message, ephemeral)
+            await interaction.response.send_message(message, ephemeral=ephemeral)
 
     async def _close_generic(self, user, guild, channel, delay):
         db = mclient.modmail.logs
@@ -86,15 +86,15 @@ class Mail(commands.Cog):
     @app_commands.describe(content='The message to send to the user')
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
-    async def _reply_user(self, interaction: discord.Interaction, content: app_commands.range[str, None, 1800]):
+    async def _reply_user(self, interaction: discord.Interaction, content: app_commands.Range[str, None, 1800]):
         await interaction.response.defer()
         await self._reply(interaction, content)
 
-    @app_commands.command(name='reply', description='Replys to a modmail, anonymously')
+    @app_commands.command(name='areply', description='Replys to a modmail, anonymously')
     @app_commands.describe(content='The message to send to the user')
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
-    async def _reply_anon(self, interaction: discord.Interaction, content: app_commands.range[str, None, 1800]):
+    async def _reply_anon(self, interaction: discord.Interaction, content: app_commands.Range[str, None, 1800]):
         await interaction.response.defer()
         await self._reply(interaction, content, True)
 
@@ -231,11 +231,11 @@ class Mail(commands.Cog):
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     class AppealDecideGroup(
-        app_commands.group, name='appeal', description='Make a decision to accept or deny a ban appeal'
+        app_commands.Group, name='appeal', description='Make a decision to accept or deny a ban appeal'
     ):
         @app_commands.command(name='accept', description='Accept a user\'s ban appeal')
         @app_commands.describe(reason='Why are you accepting this appeal?')
-        async def _appeal_accept(self, interaction: discord.Interaction, reason: app_commands.range[str, None, 990]):
+        async def _appeal_accept(self, interaction: discord.Interaction, reason: app_commands.Range[str, None, 990]):
             await interaction.response.defer()
             db = mclient.modmail.logs
             punsDB = mclient.bowser.puns
@@ -310,10 +310,10 @@ class Mail(commands.Cog):
         @app_commands.command(name='deny', description='Deny a user\'s ban appeal')
         @app_commands.describe(
             next_attempt='The amount of time until the user can appeal again, in 1w2d3h4m5s format',
-            description='Why are you denying this appeal?',
+            reason='Why are you denying this appeal?',
         )
         async def _appeal_deny(
-            self, interaction: discord.Interaction, next_attempt: str, reason: app_commands.range[str, None, 990]
+            self, interaction: discord.Interaction, next_attempt: str, reason: app_commands.Range[str, None, 990]
         ):
             await interaction.response.defer()
             db = mclient.modmail.logs
@@ -652,3 +652,7 @@ class Mail(commands.Cog):
             )
 
             raise error
+
+
+async def setup(bot):
+    await bot.add_cog(Mail(bot))
