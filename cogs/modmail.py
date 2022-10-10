@@ -23,7 +23,7 @@ except ImportError:
     exit(1)
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
-guildList = [config.guild]
+guildList = [discord.Object(id=config.guild)]
 
 
 class Mail(commands.Cog):
@@ -34,7 +34,7 @@ class Mail(commands.Cog):
 
     @app_commands.command(name='close', description='Closes a modmail thread, optionally with a delay')
     @app_commands.describe(delay='The delay for the modmail to close, in 1w2d3h4m5s format')
-    @app_commands.guild_only()
+    @app_commands.guilds(guildList)
     @app_commands.default_permissions(view_audit_log=True)
     async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str]):
 
@@ -81,7 +81,7 @@ class Mail(commands.Cog):
     @app_commands.command(name='reply', description='Replys to a modmail, with your username')
     @app_commands.describe(content='The message to send to the user')
     @app_commands.describe(attachment='An image or file to send to the user')
-    @app_commands.guild_only()
+    @app_commands.guilds(guildList)
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_user(
         self,
@@ -95,7 +95,7 @@ class Mail(commands.Cog):
     @app_commands.command(name='areply', description='Replys to a modmail, anonymously')
     @app_commands.describe(content='The message to send to the user')
     @app_commands.describe(attachment='An image or file to send to the user')
-    @app_commands.guild_only()
+    @app_commands.guilds(guildList)
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_anon(
         self,
@@ -211,7 +211,7 @@ class Mail(commands.Cog):
 
     @app_commands.command(name='open', description='Open a modmail thread with a user')
     @app_commands.describe(member='The user to start a thread with')
-    @app_commands.guild_only()
+    @app_commands.guilds(guildList)
     @app_commands.default_permissions(view_audit_log=True)
     async def _open_thread(self, interaction: discord.Interaction, member: discord.Member):
         """
