@@ -77,6 +77,7 @@ class Mail(commands.Cog):
             return f'Thread scheduled to be closed <t:{int(delayDate.timestamp())}:R>', False
 
         await utils._close_thread(self.bot, user, guild, channel, self.modLogs)
+        return None, False
 
     @app_commands.command(name='reply', description='Replys to a modmail, with your username')
     @app_commands.describe(content='The message to send to the user')
