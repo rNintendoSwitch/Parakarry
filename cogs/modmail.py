@@ -144,7 +144,7 @@ class Mail(commands.Cog):
             elif interaction.guild.owner == interaction.user:
                 responsibleModerator = f'*(Server Owner)* **{interaction.user}**'
 
-            elif self.leadModRole in interaction.guild.get_member(interaction.user).roles:
+            elif self.leadModRole in interaction.user.roles:
                 responsibleModerator = f'*(Lead Moderator)* **{interaction.user}**'
 
             else:
