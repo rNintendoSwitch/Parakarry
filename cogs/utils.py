@@ -151,7 +151,7 @@ async def _create_thread(
                 'id': str(message.author.id),
                 'name': message.author.name,
                 'discriminator': message.author.discriminator,
-                'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                'avatar_url': str(message.author.avatar.with_static_format('png').with_size(1024)),
                 'mod': is_mod,
             },
             'attachments': attachments,
@@ -179,14 +179,14 @@ async def _create_thread(
                 'id': str(recipient.id),
                 'name': recipient.name,
                 'discriminator': recipient.discriminator,
-                'avatar_url': str(recipient.avatar_url_as(static_format='png', size=1024)),
+                'avatar_url': str(recipient.avatar.with_static_format('png').with_size(1024)),
                 'mod': False,
             },
             'creator': {
                 'id': str(creator.id),
                 'name': creator.name,
                 'discriminator': creator.discriminator,
-                'avatar_url': str(creator.avatar_url_as(static_format='png', size=1024)),
+                'avatar_url': str(creator.avatar.with_static_format('png').with_size(1024)),
                 'mod': False,
             },
             'closer': None,
@@ -197,36 +197,46 @@ async def _create_thread(
     return _id
 
 
-async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
+async def _close_thread(
+    bot,
+    mod_user: discord.User,
+    guild: discord.Guild,
+    thread_channel: discord.TextChannel,
+    target_channel: discord.TextChannel,
+    dm: bool = True,
+    reason: str = None,
+):
     db = mclient.modmail.logs
-    doc = db.find_one({'channel_id': str(ctx.channel.id)})
+    doc = db.find_one({'channel_id': str(thread_channel.id)})
+
     closeInfo = {
         '$set': {
             'open': False,
             'closed_at': datetime.now(tz=timezone.utc).isoformat(sep=' '),
             'closer': {
-                'id': str(ctx.author.id),
-                'name': ctx.author.name,
-                'discriminator': ctx.author.discriminator,
-                'avatar_url': str(ctx.author.avatar_url_as(static_format='png', size=1024)),
+                'id': str(mod_user.id),
+                'name': mod_user.name,
+                'discriminator': mod_user.discriminator,
+                'avatar_url': str(mod_user.avatar.with_static_format('png').with_size(1024)),
                 'mod': True,
             },
         }
     }
+
     if reason:
         closeInfo['$set']['close_message'] = reason
-
     db.update_one({'_id': doc['_id']}, closeInfo)
+
     try:
-        channel = bot.get_channel(ctx.channel.id)
-        await channel.delete(reason=f'Modmail closed by {ctx.author}')
+        channel = bot.get_channel(thread_channel.id)
+        await channel.delete(reason=f'Modmail closed by {mod_user}')
 
     except discord.NotFound:
         pass
 
     if dm:
         try:
-            mailer = await ctx.guild.fetch_member(int(doc['recipient']['id']))
+            mailer = await guild.fetch_member(int(doc['recipient']['id']))
             await mailer.send(
                 '__Your modmail thread has been closed__. If you need to contact the chat-moderators you may send me another DM to open a new modmail thread'
             )
@@ -243,7 +253,7 @@ async def _close_thread(bot, ctx, target_channel, dm=True, reason=None):
     )
     embed.set_author(name=f'Modmail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
     embed.add_field(name='User', value=f'<@{user["id"]}>', inline=True)
-    embed.add_field(name='Moderator', value=f'{ctx.author.mention}', inline=True)
+    embed.add_field(name='Moderator', value=f'{mod_user.mention}', inline=True)
     await target_channel.send(embed=embed)
 
 
@@ -299,7 +309,10 @@ async def _trigger_create_user_thread(
     else:
         embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
 
-    embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+    embed.set_author(
+        name=f'{member} ({member.id})',
+        icon_url=member.avatar.with_static_format('png').with_size(1024),
+    )
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
     docID = await _create_thread(
@@ -374,7 +387,10 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
 
     embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
 
-    embed.set_author(name=f'{member} ({member.id})', icon_url=member.avatar_url)
+    embed.set_author(
+        name=f'{member} ({member.id})',
+        icon_url=member.avatar.with_static_format('png').with_size(1024),
+    )
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
     docID = await _create_thread(
@@ -439,8 +455,11 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
                 color=discord.Color(0x18EE1C),
                 description=f'Fetched information about {user.mention} from the API because they are not in this server. There is little information to display as they have not been recorded joining the server before.',
             )
-            embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-            embed.set_thumbnail(url=user.avatar_url)
+            embed.set_author(
+                name=f'{str(user)} | {user.id}',
+                icon_url=user.avatar.with_static_format('png').with_size(1024),
+            )
+            embed.set_thumbnail(url=user.avatar.with_static_format('png').with_size(1024))
             embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>')
             return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
 
@@ -460,8 +479,11 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     )
 
     embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
-    embed.set_author(name=f'{str(user)} | {user.id}', icon_url=user.avatar_url)
-    embed.set_thumbnail(url=user.avatar_url)
+    embed.set_author(
+        name=f'{str(user)} | {user.id}',
+        icon_url=user.avatar.with_static_format('png').with_size(1024),
+    )
+    embed.set_thumbnail(url=user.avatar.with_static_format('png').with_size(1024))
     embed.add_field(name='Messages', value=str(msgCount), inline=True)
     if inServer:
         embed.add_field(name='Join date', value=f'<t:{int(user.joined_at.timestamp())}:f>', inline=True)
