@@ -43,10 +43,12 @@ class Parakarry(commands.Bot):
 
         logging.info('All guild members have been chunked')
         logging.info('Syncing Guild Commands...')
-        for g in self.guildList:
-            await self.tree.sync(guild=discord.Object(id=g))
+        for g in self.guilds:
+            self.tree.copy_global_to(guild=g)
+            await self.tree.sync(guild=g)
 
         logging.info('Guild commands synced')
+        logging.info(self.tree.get_commands())
 
 
 asyncio.run(Parakarry().start(config.token))

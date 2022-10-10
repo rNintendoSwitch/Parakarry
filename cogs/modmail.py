@@ -31,14 +31,12 @@ class Mail(commands.Cog):
         self.bot = bot
         self.READY = False
         self.closeQueue = {}
-        loop = bot.loop
 
     @app_commands.command(name='close', description='Closes a modmail thread, optionally with a delay')
     @app_commands.describe(delay='The delay for the modmail to close, in 1w2d3h4m5s format')
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str]):
-        await interaction.response.defer()
 
         message, ephemeral = await self._close_generic(interaction.user, interaction.guild, interaction.channel, delay)
 
@@ -56,12 +54,10 @@ class Mail(commands.Cog):
             self.closeQueue[doc['_id']].cancel()
 
         if doc['ban_appeal']:
-            app_info = await self.bot.application_info()
-            if user.id != app_info.owner.id:
-                return (
-                    ':x: Only the bot owner can forcibly close a ban appeal thread. Use `/appeal accept` or `/appeal deny` instead',
-                    False,
-                )
+            return (
+                ':x: Ban appeals cannot be closed with the `/close` command. Use `/appeal accept` or `/appeal deny` instead',
+                False,
+            )
 
         if delay:
             try:
@@ -87,7 +83,7 @@ class Mail(commands.Cog):
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_user(self, interaction: discord.Interaction, content: app_commands.Range[str, None, 1800]):
-        await interaction.response.defer()
+
         await self._reply(interaction, content)
 
     @app_commands.command(name='areply', description='Replys to a modmail, anonymously')
@@ -95,10 +91,10 @@ class Mail(commands.Cog):
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_anon(self, interaction: discord.Interaction, content: app_commands.Range[str, None, 1800]):
-        await interaction.response.defer()
+
         await self._reply(interaction, content, True)
 
-    async def _reply(self, interaction, content, anonymous=False):
+    async def _reply(self, interaction: discord.Interaction, content, anonymous=False):
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(interaction.channel.id)})
         # Attachments are unable to be sent mod -> user with slash commands (unless it's a url).
@@ -160,7 +156,7 @@ class Mail(commands.Cog):
 
         embed = discord.Embed(title='Moderator message', description=content, color=0x7ED321)
         if not anonymous:
-            embed.set_author(name=f'{interaction.user} ({interaction.user.id})', icon_url=interaction.user.avatar_url)
+            embed.set_author(name=f'{interaction.user} ({interaction.user.id})', icon_url=interaction.user.avatar.url)
 
         else:
             embed.title = '[ANON] Moderator message'
@@ -181,7 +177,8 @@ class Mail(commands.Cog):
         #        elif attachments:  # Still have an attachment, but not an image
         #            embed.add_field(name=f'Attachment', value=attachments[0])
 
-        mailMsg = await interaction.reponse.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed)
+        mailMsg = await interaction.original_response()
 
         db.update_one(
             {'_id': doc['_id']},
@@ -196,7 +193,7 @@ class Mail(commands.Cog):
                             'id': str(interaction.user.id),
                             'name': interaction.user.name,
                             'discriminator': interaction.user.discriminator,
-                            'avatar_url': str(interaction.user.avatar_url_as(static_format='png', size=1024)),
+                            'avatar_url': str(interaction.user.avatar.with_static_format('png').with_size(1024)),
                             'mod': True,
                         },
                         'attachments': attachments,
@@ -213,183 +210,185 @@ class Mail(commands.Cog):
         """
         Open a modmail thread with a user
         """
-        await interaction.response.defer()
+
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
-            return await interaction.reponse.send_message(
+            return await interaction.response.send_message(
                 ':x: Unable to open modmail to user -- there is already a thread involving them currently open',
                 ephemeral=True,
             )
 
         try:
-            await utils._trigger_create_mod_thread(self.bot, interaction.guild, member, interaction.author)
+            await utils._trigger_create_mod_thread(self.bot, interaction.guild, member, interaction.user)
 
         except discord.Forbidden:
             return
 
         await interaction.response.send_message(f':white_check_mark: Modmail has been opened with {member}')
 
-    @app_commands.guild_only()
-    @app_commands.default_permissions(view_audit_log=True)
-    class AppealDecideGroup(
-        app_commands.Group, name='appeal', description='Make a decision to accept or deny a ban appeal'
-    ):
-        @app_commands.command(name='accept', description='Accept a user\'s ban appeal')
-        @app_commands.describe(reason='Why are you accepting this appeal?')
-        async def _appeal_accept(self, interaction: discord.Interaction, reason: app_commands.Range[str, None, 990]):
-            await interaction.response.defer()
-            db = mclient.modmail.logs
-            punsDB = mclient.bowser.puns
-            userDB = mclient.bowser.users
+    appeal_group = app_commands.Group(
+        name='appeal',
+        description='Make a decision to accept or deny a ban appeal',
+        guild_only=True,
+        default_permissions=discord.Permissions(view_audit_log=True),
+    )
 
-            doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
-            if not doc:
-                return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
+    @appeal_group.command(name='accept', description='Accept a user\'s ban appeal')
+    @app_commands.describe(reason='Why are you accepting this appeal?')
+    async def _appeal_accept(self, interaction: discord.Interaction, reason: app_commands.Range[str, None, 990]):
 
-            user = await self.bot.fetch_user(int(doc['recipient']['id']))
-            punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
-            punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
-            await interaction.guild.unban(user, reason=f'Ban appeal accepted by {interaction.author}')
+        db = mclient.modmail.logs
+        punsDB = mclient.bowser.puns
+        userDB = mclient.bowser.users
+
+        doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
+        if not doc:
+            return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
+
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
+        punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
+        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
+        await interaction.guild.unban(user, reason=f'Ban appeal accepted by {interaction.user}')
+        docID = str(uuid.uuid4())
+        while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
-            while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
-                docID = str(uuid.uuid4())
 
-            punsDB.insert_one(
-                {
-                    '_id': docID,
-                    'user': user.id,
-                    'moderator': interaction.user.id,
-                    'type': 'unban',
-                    'timestamp': int(time.time()),
-                    'reason': '[Ban appeal]' + reason,
-                    'expiry': None,
-                    'context': 'banappeal',
-                    'active': False,
-                }
-            )
-
-            embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
-            embed.set_author(name=f'Ban appeal accepted | {user}')
-            embed.set_footer(text=docID)
-            embed.add_field(name='User', value=user.mention, inline=True)
-            embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
-            embed.add_field(name='Reason', value=reason)
-            await self.modLogs.send(embed=embed)
-
-            try:
-                await user.send(
-                    f'The moderators have decided to **lift your ban** on the {interaction.guild} Discord and your ban appeal thread has been closed. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\nIf you are unable to join please try reloading your  Discord client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.\n\nReason given by moderators:\n```{reason}```'
-                )
-
-            except:
-                await self.bot.get_channel(config.adminChannel).send(
-                    f':warning: The ban appeal for {user} has been accepted by {interaction.user}, but I was unable to DM them the decision'
-                )
-
-            else:
-                await self.bot.get_channel(config.adminChannel).send(
-                    f':white_check_mark: The ban appeal for {user} has been accepted by {interaction.user}'
-                )
-
-            finally:
-                await utils._close_thread(
-                    self.bot,
-                    user,
-                    None,
-                    interaction.channel,
-                    self.modLogs,
-                    dm=False,
-                    reason='[Appeal accepted] ' + reason,
-                )
-                try:
-                    member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
-                    await member.kick(reason='Accepted appeal')
-
-                except:
-                    return
-
-        @app_commands.command(name='deny', description='Deny a user\'s ban appeal')
-        @app_commands.describe(
-            next_attempt='The amount of time until the user can appeal again, in 1w2d3h4m5s format',
-            reason='Why are you denying this appeal?',
+        punsDB.insert_one(
+            {
+                '_id': docID,
+                'user': user.id,
+                'moderator': interaction.user.id,
+                'type': 'unban',
+                'timestamp': int(time.time()),
+                'reason': '[Ban appeal]' + reason,
+                'expiry': None,
+                'context': 'banappeal',
+                'active': False,
+            }
         )
-        async def _appeal_deny(
-            self, interaction: discord.Interaction, next_attempt: str, reason: app_commands.Range[str, None, 990]
-        ):
-            await interaction.response.defer()
-            db = mclient.modmail.logs
-            punsDB = mclient.bowser.puns
-            userDB = mclient.bowser.users
 
-            doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
-            if not doc:
-                return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
+        embed.set_author(name=f'Ban appeal accepted | {user}')
+        embed.set_footer(text=docID)
+        embed.add_field(name='User', value=user.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
+        embed.add_field(name='Reason', value=reason)
+        await self.modLogs.send(embed=embed)
 
-            try:
-                delayDate = utils.resolve_duration(next_attempt)
-
-            except KeyError:
-                return await interaction.response.send_message('Invalid duration')
-
-            user = await self.bot.fetch_user(int(doc['recipient']['id']))
-            docID = str(uuid.uuid4())
-            while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
-                docID = str(uuid.uuid4())
-
-            punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
-            punsDB.insert_one(
-                {
-                    '_id': docID,
-                    'user': user.id,
-                    'moderator': interaction.user.id,
-                    'type': 'appealdeny',
-                    'timestamp': int(time.time()),
-                    'reason': reason,
-                    'expiry': int(delayDate.timestamp()),
-                    'context': 'banappeal',
-                    'active': True,
-                }
+        try:
+            await user.send(
+                f'The moderators have decided to **lift your ban** on the {interaction.guild} Discord and your ban appeal thread has been closed. We kindly ask that you look over our server rules again upon your return. You may join back with this invite link: https://discord.gg/switch\nIf you are unable to join please try reloading your  Discord client. Still can\'t join? You are likely IP banned on another account and you will need to appeal that ban as well.\n\nReason given by moderators:\n```{reason}```'
             )
 
-            embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
-            embed.set_author(name=f'Ban appeal denied | {user}')
-            embed.set_footer(text=docID)
-            embed.add_field(name='User', value=user.mention, inline=True)
-            embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
-            embed.add_field(name='Next appeal in', value=f'<t:{int(delayDate.timestamp())}:R>')
-            embed.add_field(name='Reason', value=reason)
-            await self.modLogs.send(embed=embed)
+        except:
+            await self.bot.get_channel(config.adminChannel).send(
+                f':warning: The ban appeal for {user} has been accepted by {interaction.user}, but I was unable to DM them the decision'
+            )
 
+        else:
+            await self.bot.get_channel(config.adminChannel).send(
+                f':white_check_mark: The ban appeal for {user} has been accepted by {interaction.user}'
+            )
+
+        finally:
+            await utils._close_thread(
+                self.bot,
+                user,
+                None,
+                interaction.channel,
+                self.modLogs,
+                dm=False,
+                reason='[Appeal accepted] ' + reason,
+            )
             try:
-                await user.send(
-                    f'The moderators have decided to **uphold your ban** on the {interaction.guild} Discord and your ban appeal thread has been closed. You may appeal again after __<t:{int(delayDate.timestamp())}:f> (approximately <t:{int(delayDate.timestamp())}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
-                )
+                member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
+                await member.kick(reason='Accepted appeal')
 
             except:
-                await self.bot.get_channel(config.adminChannel).send(
-                    f':warning: The ban appeal for {user} has been denied by {interaction.user} until <t:{int(delayDate.timestamp())}:f>, but I was unable to DM them the decision'
-                )
+                return
 
-            else:
-                await self.bot.get_channel(config.adminChannel).send(
-                    f':white_check_mark: The ban appeal for {user} has been denied by {interaction.user} until <t:{int(delayDate.timestamp())}:f>'
-                )
+    @appeal_group.command(name='deny', description='Deny a user\'s ban appeal')
+    @app_commands.describe(
+        next_attempt='The amount of time until the user can appeal again, in 1w2d3h4m5s format',
+        reason='Why are you denying this appeal?',
+    )
+    async def _appeal_deny(
+        self, interaction: discord.Interaction, next_attempt: str, reason: app_commands.Range[str, None, 990]
+    ):
 
-            finally:
-                await utils._close_thread(
-                    self.bot,
-                    user,
-                    None,
-                    interaction.channel,
-                    self.modLogs,
-                    dm=False,
-                    reason='[Appeal denied] ' + reason,
-                )
-                try:
-                    member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
-                    await member.kick(reason='Failed appeal')
+        db = mclient.modmail.logs
+        punsDB = mclient.bowser.puns
+        userDB = mclient.bowser.users
 
-                except:
-                    return
+        doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
+        if not doc:
+            return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
+
+        try:
+            delayDate = utils.resolve_duration(next_attempt)
+
+        except KeyError:
+            return await interaction.response.send_message('Invalid duration')
+
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
+        docID = str(uuid.uuid4())
+        while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
+            docID = str(uuid.uuid4())
+
+        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
+        punsDB.insert_one(
+            {
+                '_id': docID,
+                'user': user.id,
+                'moderator': interaction.user.id,
+                'type': 'appealdeny',
+                'timestamp': int(time.time()),
+                'reason': reason,
+                'expiry': int(delayDate.timestamp()),
+                'context': 'banappeal',
+                'active': True,
+            }
+        )
+
+        embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
+        embed.set_author(name=f'Ban appeal denied | {user}')
+        embed.set_footer(text=docID)
+        embed.add_field(name='User', value=user.mention, inline=True)
+        embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
+        embed.add_field(name='Next appeal in', value=f'<t:{int(delayDate.timestamp())}:R>')
+        embed.add_field(name='Reason', value=reason)
+        await self.modLogs.send(embed=embed)
+
+        try:
+            await user.send(
+                f'The moderators have decided to **uphold your ban** on the {interaction.guild} Discord and your ban appeal thread has been closed. You may appeal again after __<t:{int(delayDate.timestamp())}:f> (approximately <t:{int(delayDate.timestamp())}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
+            )
+
+        except:
+            await self.bot.get_channel(config.adminChannel).send(
+                f':warning: The ban appeal for {user} has been denied by {interaction.user} until <t:{int(delayDate.timestamp())}:f>, but I was unable to DM them the decision'
+            )
+
+        else:
+            await self.bot.get_channel(config.adminChannel).send(
+                f':white_check_mark: The ban appeal for {user} has been denied by {interaction.user} until <t:{int(delayDate.timestamp())}:f>'
+            )
+
+        finally:
+            await utils._close_thread(
+                self.bot,
+                user,
+                None,
+                interaction.channel,
+                self.modLogs,
+                dm=False,
+                reason='[Appeal denied] ' + reason,
+            )
+            try:
+                member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
+                await member.kick(reason='Failed appeal')
+
+            except:
+                return
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -427,7 +426,7 @@ class Mail(commands.Cog):
             db = mclient.modmail.logs
             doc = db.find_one({'open': True, 'creator.id': str(user.id)})
             if doc:
-                await self.bot.get_channel(int(doc['channel_id'])).trigger_typing()
+                await self.bot.get_channel(int(doc['channel_id'])).typing()
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, member):
@@ -459,11 +458,10 @@ class Mail(commands.Cog):
         try:
             await guild.fetch_ban(member)
 
-        except discord.NotFound:
+        except discord.errors.NotFound:
             guildMember = guild.get_member(member.id)
-            if (
-                guildMember
-                and guild.get_role(config.modRole) in guildMember.roles
+            if guildMember and (
+                guild.get_role(config.modRole) in guildMember.roles
                 or guild.get_role(config.trialModRole) in guildMember.roles
             ):
                 return
@@ -491,7 +489,7 @@ class Mail(commands.Cog):
                     channel.send(msg)
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
         attachments = [x.url for x in message.attachments]
@@ -520,7 +518,7 @@ class Mail(commands.Cog):
 
                 description = content
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
-                embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
+                embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar.url)
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
 
                 if len(attachments) > 1:  # More than one attachment, use fields
@@ -551,7 +549,7 @@ class Mail(commands.Cog):
                                     'id': str(message.author.id),
                                     'name': message.author.name,
                                     'discriminator': message.author.discriminator,
-                                    'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                                    'avatar_url': str(message.author.avatar.with_static_format('png').with_size(1024)),
                                     'mod': False,
                                 },
                                 'attachments': attachments,
@@ -572,7 +570,10 @@ class Mail(commands.Cog):
 
                 # TODO: Don't duplicate message embed code based on new thread or just new message
                 embed = discord.Embed(title='New message', description=content, color=0x32B6CE)
-                embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar_url)
+                embed.set_author(
+                    name=f'{message.author} ({message.author.id})',
+                    icon_url=message.author.avatar.with_static_format('png').with_size(1024),
+                )
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
 
                 if len(attachments) > 1:  # More than one attachment, use fields
@@ -609,7 +610,9 @@ class Mail(commands.Cog):
                                         'id': str(message.author.id),
                                         'name': message.author.name,
                                         'discriminator': message.author.discriminator,
-                                        'avatar_url': str(message.author.avatar_url_as(static_format='png', size=1024)),
+                                        'avatar_url': str(
+                                            message.author.avatar.with_static_format('png').with_size(1024)
+                                        ),
                                         'mod': True,
                                     },
                                     'attachments': attachments,
