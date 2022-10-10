@@ -175,7 +175,7 @@ class Mail(commands.Cog):
             )
 
         if attachment and re.search(
-            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachment), re.IGNORECASE
+            r'\.(gif|jpe?g|tiff|png|webp)$', str(attachment), re.IGNORECASE
         ):  # One attachment, image
             embed.set_image(url=replyMessage.attachments[0].url)
 
@@ -532,7 +532,7 @@ class Mail(commands.Cog):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
 
                 elif attachments and re.search(
-                    r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+                    r'\.(gif|jpe?g|tiff|png|webp)$', str(attachments[0]), re.IGNORECASE
                 ):  # One attachment, image
                     embed.set_image(url=attachments[0])
 
@@ -587,7 +587,7 @@ class Mail(commands.Cog):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
 
                 elif attachments and re.search(
-                    r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+                    r'\.(gif|jpe?g|tiff|png|webp)$', str(attachments[0]), re.IGNORECASE
                 ):  # One attachment, image
                     embed.set_image(url=attachments[0])
 
