@@ -32,6 +32,9 @@ class Mail(commands.Cog):
         self.READY = False
         self.closeQueue = {}
 
+        self.openContextMenu = app_commands.ContextMenu(name='Open a Modmail', callback=self._open_context)
+        self.bot.tree.add_command(self.openContextMenu, guild=discord.Object(id=config.guild))
+
     @app_commands.command(name='close', description='Closes a modmail thread, optionally with a delay')
     @app_commands.describe(delay='The delay for the modmail to close, in 1w2d3h4m5s format')
     @app_commands.guild_only()
@@ -212,10 +215,29 @@ class Mail(commands.Cog):
     @app_commands.describe(member='The user to start a thread with')
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
+    async def _open_slash(self, interaction: discord.Interaction, member: discord.Member):
+        """
+        Open a modmail thread with a user
+        """
+
+        await self._open_thread(interaction, member)
+
+    async def _open_context(self, interaction: discord.Interaction, member: discord.Member):
+        """
+        Open a modmail thread with a user
+        """
+
+        await self._open_thread(interaction, member)
+
     async def _open_thread(self, interaction: discord.Interaction, member: discord.Member):
         """
         Open a modmail thread with a user
         """
+
+        if member.bot:
+            return await interaction.response.send_message(
+                ':x: Modmail threads cannot be opened with bot accounts', ephemeral=True
+            )
 
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
             return await interaction.response.send_message(
@@ -229,7 +251,9 @@ class Mail(commands.Cog):
         except discord.Forbidden:
             return
 
-        await interaction.response.send_message(f':white_check_mark: Modmail has been opened with {member}')
+        await interaction.response.send_message(
+            f':white_check_mark: Modmail has been opened with {member}', ephemeral=True
+        )
 
     appeal_group = app_commands.Group(
         name='appeal',

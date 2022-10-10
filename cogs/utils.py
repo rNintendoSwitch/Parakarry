@@ -417,7 +417,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
                 )
 
     embed.description = description
-    mailMsg = await channel.send(embed=embed)
+    mailMsg = await channel.send(moderator.mention, embed=embed)
     await _info(await bot.get_context(mailMsg), bot, await guild.fetch_member(member.id))
     try:
         await member.send(
