@@ -80,30 +80,43 @@ class Mail(commands.Cog):
 
     @app_commands.command(name='reply', description='Replys to a modmail, with your username')
     @app_commands.describe(content='The message to send to the user')
+    @app_commands.describe(attachment='An image or file to send to the user')
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
-    async def _reply_user(self, interaction: discord.Interaction, content: app_commands.Range[str, None, 1800]):
+    async def _reply_user(
+        self,
+        interaction: discord.Interaction,
+        content: app_commands.Range[str, None, 1800],
+        attachment: typing.Optional[discord.Attachment],
+    ):
 
-        await self._reply(interaction, content)
+        await self._reply(interaction, content, attachment)
 
     @app_commands.command(name='areply', description='Replys to a modmail, anonymously')
     @app_commands.describe(content='The message to send to the user')
+    @app_commands.describe(attachment='An image or file to send to the user')
     @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
-    async def _reply_anon(self, interaction: discord.Interaction, content: app_commands.Range[str, None, 1800]):
+    async def _reply_anon(
+        self,
+        interaction: discord.Interaction,
+        content: app_commands.Range[str, None, 1800],
+        attachment: typing.Optional[discord.Attachment],
+    ):
 
-        await self._reply(interaction, content, True)
+        await self._reply(interaction, content, attachment, True)
 
-    async def _reply(self, interaction: discord.Interaction, content, anonymous=False):
+    async def _reply(self, interaction: discord.Interaction, content, attachment, anonymous=False):
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(interaction.channel.id)})
         # Attachments are unable to be sent mod -> user with slash commands (unless it's a url).
         #
         # attachments = [x.url for x in ctx.message.attachments]
         # TODO: If ever able, reenable this functionality
-        attachments = []
-        # if not content and not attachments:
-        #    return await ctx.send('You must provide reply content, attachments, or both to use this command')
+        if not content and not attachment:
+            return await interaction.response.send_message(
+                'You must provide reply content, attachments, or both to use this command', ephemeral=True
+            )
 
         if (
             interaction.channel.category_id != config.category or not doc
@@ -145,9 +158,13 @@ class Mail(commands.Cog):
             else:
                 responsibleModerator = f'*(Moderator)* **{interaction.user}**'
 
-            await member.send(f'Reply from {responsibleModerator}: {content if content else ""}')
-            # if attachments:
-            #    await member.send('\n'.join(attachments))
+            replyText = f'Reply from {responsibleModerator}: {content if content else ""}'
+
+            if attachment:
+                replyMessage = await member.send(replyText, file=await attachment.to_file())
+
+            else:
+                replyMessage = await member.send(replyText)
 
         except:
             return await interaction.response.send_message(
@@ -165,17 +182,13 @@ class Mail(commands.Cog):
                 icon_url='https://cdn.mattbsg.xyz/rns/snoo.png',
             )
 
-        #        if len(attachments) > 1:  # More than one attachment, use fields
-        #            for x in range(len(attachments)):
-        #                embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
-        #
-        #        elif attachments and re.search(
-        #            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
-        #        ):  # One attachment, image
-        #            embed.set_image(url=attachments[0])
-        #
-        #        elif attachments:  # Still have an attachment, but not an image
-        #            embed.add_field(name=f'Attachment', value=attachments[0])
+        if attachment and re.search(
+            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachment), re.IGNORECASE
+        ):  # One attachment, image
+            embed.set_image(url=replyMessage.attachments[0].url)
+
+        elif attachment:  # Still have an attachment, but not an image
+            embed.add_field(name=f'Attachment', value=replyMessage.attachments[0].url)
 
         await interaction.response.send_message(embed=embed)
         mailMsg = await interaction.original_response()
@@ -196,7 +209,7 @@ class Mail(commands.Cog):
                             'avatar_url': str(interaction.user.avatar.with_static_format('png').with_size(1024)),
                             'mod': True,
                         },
-                        'attachments': attachments,
+                        'attachments': [replyMessage.attachments[0].url] if replyMessage.attachments else [],
                     }
                 }
             },
@@ -495,7 +508,6 @@ class Mail(commands.Cog):
         attachments = [x.url for x in message.attachments]
         ctx = await self.bot.get_context(message)
 
-        # This only works for discord.py 2.0+
         if message.content:
             content = message.content
         elif message.stickers:
@@ -520,6 +532,8 @@ class Mail(commands.Cog):
                 embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
                 embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar.url)
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
+                if message.stickers:
+                    embed.set_image(url=message.stickers[0].url)
 
                 if len(attachments) > 1:  # More than one attachment, use fields
                     for x in range(len(attachments)):
@@ -552,7 +566,7 @@ class Mail(commands.Cog):
                                     'avatar_url': str(message.author.avatar.with_static_format('png').with_size(1024)),
                                     'mod': False,
                                 },
-                                'attachments': attachments,
+                                'attachments': [x.url for x in message.stickers] + attachments,
                             }
                         }
                     },

@@ -48,7 +48,6 @@ class Parakarry(commands.Bot):
             await self.tree.sync(guild=g)
 
         logging.info('Guild commands synced')
-        logging.info(self.tree.get_commands())
 
 
 asyncio.run(Parakarry().start(config.token))
