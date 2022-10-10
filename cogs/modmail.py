@@ -132,10 +132,12 @@ class Mail(commands.Cog):
                 try:
                     member = await self.bot.get_guild(config.appealGuild).fetch_member(recipient)
 
-                except:
-                    return await interaction.response.send_message(
+                except Exception as e:
+                    await interaction.response.send_message(
                         'There was an issue replying to this user, they may have left the server'
                     )
+                    logging.error(f'Issue with replying to user in thread {doc["_id"]}: {e}')
+                    raise
 
         try:
             if anonymous:
