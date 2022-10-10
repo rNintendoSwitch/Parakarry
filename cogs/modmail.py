@@ -109,10 +109,6 @@ class Mail(commands.Cog):
     async def _reply(self, interaction: discord.Interaction, content, attachment, anonymous=False):
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(interaction.channel.id)})
-        # Attachments are unable to be sent mod -> user with slash commands (unless it's a url).
-        #
-        # attachments = [x.url for x in ctx.message.attachments]
-        # TODO: If ever able, reenable this functionality
         if not content and not attachment:
             return await interaction.response.send_message(
                 'You must provide reply content, attachments, or both to use this command', ephemeral=True
