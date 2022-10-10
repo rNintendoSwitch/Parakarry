@@ -23,7 +23,7 @@ except ImportError:
     exit(1)
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
-guildList = [discord.Object(id=config.guild)]
+guildList = [config.guild]
 
 
 class Mail(commands.Cog):
@@ -34,7 +34,7 @@ class Mail(commands.Cog):
 
     @app_commands.command(name='close', description='Closes a modmail thread, optionally with a delay')
     @app_commands.describe(delay='The delay for the modmail to close, in 1w2d3h4m5s format')
-    @app_commands.guilds(guildList)
+    @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str]):
 
@@ -81,7 +81,7 @@ class Mail(commands.Cog):
     @app_commands.command(name='reply', description='Replys to a modmail, with your username')
     @app_commands.describe(content='The message to send to the user')
     @app_commands.describe(attachment='An image or file to send to the user')
-    @app_commands.guilds(guildList)
+    @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_user(
         self,
@@ -95,7 +95,7 @@ class Mail(commands.Cog):
     @app_commands.command(name='areply', description='Replys to a modmail, anonymously')
     @app_commands.describe(content='The message to send to the user')
     @app_commands.describe(attachment='An image or file to send to the user')
-    @app_commands.guilds(guildList)
+    @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_anon(
         self,
@@ -132,12 +132,10 @@ class Mail(commands.Cog):
                 try:
                     member = await self.bot.get_guild(config.appealGuild).fetch_member(recipient)
 
-                except Exception as e:
-                    await interaction.response.send_message(
+                except:
+                    return await interaction.response.send_message(
                         'There was an issue replying to this user, they may have left the server'
                     )
-                    logging.error(f'Issue with replying to user in thread {doc["_id"]}: {e}')
-                    raise
 
         try:
             if anonymous:
@@ -177,7 +175,7 @@ class Mail(commands.Cog):
             )
 
         if attachment and re.search(
-            r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachment), re.IGNORECASE
+            r'\.(gif|jpe?g|tiff|png|webp)$', str(attachment), re.IGNORECASE
         ):  # One attachment, image
             embed.set_image(url=replyMessage.attachments[0].url)
 
@@ -211,7 +209,7 @@ class Mail(commands.Cog):
 
     @app_commands.command(name='open', description='Open a modmail thread with a user')
     @app_commands.describe(member='The user to start a thread with')
-    @app_commands.guilds(guildList)
+    @app_commands.guild_only()
     @app_commands.default_permissions(view_audit_log=True)
     async def _open_thread(self, interaction: discord.Interaction, member: discord.Member):
         """
@@ -534,7 +532,7 @@ class Mail(commands.Cog):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
 
                 elif attachments and re.search(
-                    r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+                    r'\.(gif|jpe?g|tiff|png|webp)$', str(attachments[0]), re.IGNORECASE
                 ):  # One attachment, image
                     embed.set_image(url=attachments[0])
 
@@ -589,7 +587,7 @@ class Mail(commands.Cog):
                         embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
 
                 elif attachments and re.search(
-                    r'\.(gif|jpe?g|tiff|png|webp|bmp)$', str(attachments[0]), re.IGNORECASE
+                    r'\.(gif|jpe?g|tiff|png|webp)$', str(attachments[0]), re.IGNORECASE
                 ):  # One attachment, image
                     embed.set_image(url=attachments[0])
 

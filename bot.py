@@ -50,21 +50,4 @@ class Parakarry(commands.Bot):
         logging.info('Guild commands synced')
 
 
-async def _team_check(ctx):
-    app_info = await ctx.bot.application_info()
-    if app_info.team:
-        devs = app_info.team.members
-
-    else:
-        devs = [app_info.owner]
-
-    return ctx.author in devs
-
-
-@Parakarry.command(name='sync')
-@Parakarry.check(_team_check)
-async def sync_commands(ctx):
-    await Parakarry.tree.sync(guild=ctx.guild)
-
-
 asyncio.run(Parakarry().start(config.token))
