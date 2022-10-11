@@ -8,6 +8,7 @@ import pymongo
 
 import exceptions
 
+
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 punNames = {
     'strike': '{} Strike{}',
