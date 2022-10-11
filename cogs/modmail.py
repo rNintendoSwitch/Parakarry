@@ -29,7 +29,6 @@ guildList = [config.guild]
 class Mail(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.READY = False
         self.closeQueue = {}
 
         self.openContextMenu = app_commands.ContextMenu(name='Open a Modmail', callback=self._open_context)
@@ -37,7 +36,7 @@ class Mail(commands.Cog):
 
     @app_commands.command(name='close', description='Closes a modmail thread, optionally with a delay')
     @app_commands.describe(delay='The delay for the modmail to close, in 1w2d3h4m5s format')
-    @app_commands.guild_only()
+    @app_commands.guilds(discord.Object(id=config.guild))
     @app_commands.default_permissions(view_audit_log=True)
     async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str]):
 
@@ -74,18 +73,18 @@ class Mail(commands.Cog):
             close_action = event_loop.call_later(
                 delayTime,
                 event_loop.create_task,
-                utils._close_thread(self.bot, user, guild, channel, self.modLogs),
+                utils._close_thread(self.bot, user, guild, channel, self.bot.get_channel(config.modLog)),
             )
             self.closeQueue[doc['_id']] = close_action
             return f'Thread scheduled to be closed <t:{int(delayDate.timestamp())}:R>', False
 
-        await utils._close_thread(self.bot, user, guild, channel, self.modLogs)
+        await utils._close_thread(self.bot, user, guild, channel, self.bot.get_channel(config.modLog))
         return None, False
 
     @app_commands.command(name='reply', description='Replys to a modmail, with your username')
     @app_commands.describe(content='The message to send to the user')
     @app_commands.describe(attachment='An image or file to send to the user')
-    @app_commands.guild_only()
+    @app_commands.guilds(discord.Object(id=config.guild))
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_user(
         self,
@@ -99,7 +98,7 @@ class Mail(commands.Cog):
     @app_commands.command(name='areply', description='Replys to a modmail, anonymously')
     @app_commands.describe(content='The message to send to the user')
     @app_commands.describe(attachment='An image or file to send to the user')
-    @app_commands.guild_only()
+    @app_commands.guilds(discord.Object(id=config.guild))
     @app_commands.default_permissions(view_audit_log=True)
     async def _reply_anon(
         self,
@@ -148,7 +147,7 @@ class Mail(commands.Cog):
             elif interaction.guild.owner == interaction.user:
                 responsibleModerator = f'*(Server Owner)* **{interaction.user}**'
 
-            elif self.leadModRole in interaction.user.roles:
+            elif self.bot.get_guild(config.guild).get_role(config.leadModRole) in interaction.user.roles:
                 responsibleModerator = f'*(Lead Moderator)* **{interaction.user}**'
 
             else:
@@ -162,7 +161,7 @@ class Mail(commands.Cog):
             else:
                 replyMessage = await member.send(replyText)
 
-        except:
+        except discord.errors.Forbidden:
             return await interaction.response.send_message(
                 'There was an issue replying to this user, they may have left the server or disabled DMs'
             )
@@ -213,7 +212,7 @@ class Mail(commands.Cog):
 
     @app_commands.command(name='open', description='Open a modmail thread with a user')
     @app_commands.describe(member='The user to start a thread with')
-    @app_commands.guild_only()
+    @app_commands.guilds(discord.Object(id=config.guild))
     @app_commands.default_permissions(view_audit_log=True)
     async def _open_slash(self, interaction: discord.Interaction, member: discord.Member):
         """
@@ -302,7 +301,7 @@ class Mail(commands.Cog):
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
         embed.add_field(name='Reason', value=reason)
-        await self.modLogs.send(embed=embed)
+        await self.bot.get_channel(config.modLog).send(embed=embed)
 
         try:
             await user.send(
@@ -325,7 +324,7 @@ class Mail(commands.Cog):
                 user,
                 None,
                 interaction.channel,
-                self.modLogs,
+                self.bot.get_channel(config.modLog),
                 dm=False,
                 reason='[Appeal accepted] ' + reason,
             )
@@ -386,7 +385,7 @@ class Mail(commands.Cog):
         embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
         embed.add_field(name='Next appeal in', value=f'<t:{int(delayDate.timestamp())}:R>')
         embed.add_field(name='Reason', value=reason)
-        await self.modLogs.send(embed=embed)
+        await self.bot.get_channel(config.modLog).send(embed=embed)
 
         try:
             await user.send(
@@ -409,7 +408,7 @@ class Mail(commands.Cog):
                 user,
                 None,
                 interaction.channel,
-                self.modLogs,
+                self.bot.get_channel(config.modLog),
                 dm=False,
                 reason='[Appeal denied] ' + reason,
             )
@@ -419,18 +418,6 @@ class Mail(commands.Cog):
 
             except:
                 return
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        logging.info('[Bot] Ready')
-        if not self.READY:
-            self.READY = True
-            self.modLogs = self.bot.get_channel(config.modLog)
-            self.bot.remove_command('help')
-
-            self.leadModRole = self.bot.get_guild(config.guild).get_role(config.leadModRole)
-            self.modRole = self.bot.get_guild(config.guild).get_role(config.modRole)
-            self.trialModRole = self.bot.get_guild(config.guild).get_role(config.trialModRole)
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):

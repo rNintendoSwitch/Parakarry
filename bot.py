@@ -29,6 +29,7 @@ class Parakarry(commands.Bot):
             intents=discord.Intents(guilds=True, members=True, bans=True, messages=True, typing=True),
         )
         self.guildList = [config.guild]
+        self.remove_command('help')
 
     async def setup_hook(self):
         await self.load_extension('jishaku')
@@ -40,14 +41,6 @@ class Parakarry(commands.Bot):
         for g in self.guilds:
             await g.chunk(cache=True)
             logging.info(f'Chunked members for guild: {g.name} ({g.id})')
-
-        logging.info('All guild members have been chunked')
-        logging.info('Syncing Guild Commands...')
-        for g in self.guilds:
-            self.tree.copy_global_to(guild=g)
-            await self.tree.sync(guild=g)
-
-        logging.info('Guild commands synced')
 
 
 asyncio.run(Parakarry().start(config.token))
