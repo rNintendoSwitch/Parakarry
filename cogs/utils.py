@@ -6,6 +6,8 @@ import config
 import discord
 import pymongo
 
+import exceptions
+
 
 mclient = pymongo.MongoClient(config.mongoHost, username=config.mongoUser, password=config.mongoPass)
 punNames = {
@@ -137,6 +139,7 @@ async def _create_thread(
     ban_appeal=False,
     message=None,
     created_at=None,
+    report=None,
 ):
     db = mclient.modmail.logs
     initial_message = None
@@ -146,12 +149,12 @@ async def _create_thread(
             'timestamp': str(message.created_at),
             'message_id': str(message.id),
             'content': message.content if not content else content,
-            'type': 'mention' if is_mention else 'thread_message',
+            'type': 'report' if report else 'thread_message',
             'author': {
                 'id': str(message.author.id),
                 'name': message.author.name,
                 'discriminator': message.author.discriminator,
-                'avatar_url': str(message.author.avatar.with_static_format('png').with_size(1024)),
+                'avatar_url': str(message.author.display_avatar.with_static_format('png').with_size(1024)),
                 'mod': is_mod,
             },
             'attachments': attachments,
@@ -159,7 +162,11 @@ async def _create_thread(
         }
 
         _id = str(message.id) + '-' + str(int(time.time()))
-        created_at = str(message.created_at)
+        if report:
+            created_at = datetime.now(tz=timezone.utc).isoformat(sep=' ')
+
+        else:
+            created_at = str(message.created_at)
 
     else:
         _id = str(channel.id) + '-' + str(int(time.time()))
@@ -179,14 +186,14 @@ async def _create_thread(
                 'id': str(recipient.id),
                 'name': recipient.name,
                 'discriminator': recipient.discriminator,
-                'avatar_url': str(recipient.avatar.with_static_format('png').with_size(1024)),
+                'avatar_url': str(recipient.display_avatar.with_static_format('png').with_size(1024)),
                 'mod': False,
             },
             'creator': {
                 'id': str(creator.id),
                 'name': creator.name,
                 'discriminator': creator.discriminator,
-                'avatar_url': str(creator.avatar.with_static_format('png').with_size(1024)),
+                'avatar_url': str(creator.display_avatar.with_static_format('png').with_size(1024)),
                 'mod': False,
             },
             'closer': None,
@@ -217,7 +224,7 @@ async def _close_thread(
                 'id': str(mod_user.id),
                 'name': mod_user.name,
                 'discriminator': mod_user.discriminator,
-                'avatar_url': str(mod_user.avatar.with_static_format('png').with_size(1024)),
+                'avatar_url': str(mod_user.display_avatar.with_static_format('png').with_size(1024)),
                 'mod': True,
             },
         }
@@ -258,11 +265,12 @@ async def _close_thread(
 
 
 async def _trigger_create_user_thread(
-    bot, member, message, open_type, is_mention=False, moderator=None, content=None, anonymous=True
+    bot, member, message, open_type, is_mention=False, moderator=None, content=None, anonymous=True, interaction=None
 ):
     db = mclient.modmail.logs
     punsDB = mclient.bowser.puns
     banAppeal = False
+    successfulDM = False
 
     guild = bot.get_guild(config.guild)
     appealGuild = bot.get_guild(config.appealGuild)
@@ -291,11 +299,7 @@ async def _trigger_create_user_thread(
     # Deny thread creation if modmail restricted
     if open_type == 'user' and not banAppeal:
         if not mclient.bowser.users.find_one({'_id': member.id})['modmail']:
-            await member.send(
-                'Sorry, I cannot create a new modmail thread because you are currently blacklisted. '
-                'You may DM a moderator if you still need to contact a Discord staff member.'
-            )
-            raise RuntimeError('User is blacklisted from modmail')
+            raise exceptions.ModmailBlacklisted
 
     category = guild.get_channel(config.category)
     channelName = f'{member.name}-{member.discriminator}'
@@ -311,7 +315,7 @@ async def _trigger_create_user_thread(
 
     embed.set_author(
         name=f'{member} ({member.id})',
-        icon_url=member.avatar.with_static_format('png').with_size(1024),
+        icon_url=member.display_avatar.with_static_format('png').with_size(1024),
     )
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
@@ -321,10 +325,11 @@ async def _trigger_create_user_thread(
         member if not moderator else moderator,
         member,
         is_mention,
-        content=None if not content else content,
+        content=content,
         is_mod=True if moderator else False,
         ban_appeal=banAppeal,
         message=message,
+        report=interaction,
     )
 
     punsDB = mclient.bowser.puns
@@ -362,11 +367,16 @@ async def _trigger_create_user_thread(
         )
 
     else:
-        await member.send(
-            f'Hi there!\nYou have opened a modmail thread with the chat moderators who oversee the **{guild.name}** Discord and they have received your message.\n\nI will send you a message when moderators respond to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅. \n\nPlease be patient for a response; if this is an urgent issue you may also ping the Chat-Mods with @Chat-Mods in a channel'
-        )
+        try:
+            await member.send(
+                f'Hi there!\nYou have opened a modmail thread with the chat moderators who oversee the **{guild.name}** Discord and they have received your message.\n\nI will send you a message when moderators respond to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅. \n\nPlease be patient for a response; if this is an urgent issue you may also ping the Chat-Mods with @Chat-Mods in a channel'
+            )
+            successfulDM = True
 
-    return channel
+        except discord.Forbidden:
+            pass
+
+    return channel, successfulDM
 
 
 async def _trigger_create_mod_thread(bot, guild, member, moderator):
@@ -389,7 +399,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
 
     embed.set_author(
         name=f'{member} ({member.id})',
-        icon_url=member.avatar.with_static_format('png').with_size(1024),
+        icon_url=member.display_avatar.with_static_format('png').with_size(1024),
     )
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
@@ -457,9 +467,9 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
             )
             embed.set_author(
                 name=f'{str(user)} | {user.id}',
-                icon_url=user.avatar.with_static_format('png').with_size(1024),
+                icon_url=user.display_avatar.with_static_format('png').with_size(1024),
             )
-            embed.set_thumbnail(url=user.avatar.with_static_format('png').with_size(1024))
+            embed.set_thumbnail(url=user.display_avatar.with_static_format('png').with_size(1024))
             embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>')
             return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
 
@@ -481,9 +491,9 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     embed = discord.Embed(color=discord.Color(0x18EE1C), description=desc)
     embed.set_author(
         name=f'{str(user)} | {user.id}',
-        icon_url=user.avatar.with_static_format('png').with_size(1024),
+        icon_url=user.display_avatar.with_static_format('png').with_size(1024),
     )
-    embed.set_thumbnail(url=user.avatar.with_static_format('png').with_size(1024))
+    embed.set_thumbnail(url=user.display_avatar.with_static_format('png').with_size(1024))
     embed.add_field(name='Messages', value=str(msgCount), inline=True)
     if inServer:
         embed.add_field(name='Join date', value=f'<t:{int(user.joined_at.timestamp())}:f>', inline=True)
