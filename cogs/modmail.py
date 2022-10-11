@@ -264,29 +264,28 @@ class Mail(commands.Cog):
         )
 
     async def _message_report(self, interaction: discord.Interaction, message: discord.Message):
+        await interaction.response.defer(ephemeral=True)
         if message.author.bot:
-            return await interaction.response.send_message(
-                ':x: You cannot report messages sent by bots', ephemeral=True
-            )
+            return await interaction.followup.send(':x: You cannot report messages sent by bots', ephemeral=True)
 
         try:
             dmOpened = await self._user_create_thread(message, interaction)
 
         except exceptions.ModmailBlacklisted:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 'Sorry, I cannot create a message report because you are currently blacklisted. '
                 'You may DM a moderator if you still need to contact a Discord staff member.',
                 ephemeral=True,
             )
 
         if dmOpened:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 'Thank you for the report, a moderator will review it soon. If you have any additional information to add you can send me a direct message and I will forward it to the moderators.',
                 ephemeral=True,
             )
 
         else:
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 'Thank you for the report. Since your direct messages are disabled, you will not be able to receive any followup messages from moderators. If you do wish to be notified about updates to this report, please turn them on.',
                 ephemeral=True,
             )
@@ -671,7 +670,11 @@ class Mail(commands.Cog):
 
             else:
                 thread, successfulDM = await utils._trigger_create_user_thread(
-                    self.bot, message.author if not interaction else interaction.user, message, 'user'
+                    self.bot,
+                    message.author if not interaction else interaction.user,
+                    message,
+                    'user',
+                    interaction=interaction,
                 )
 
                 content, embed = self._format_message_embed(message, attachments, interaction=interaction)
