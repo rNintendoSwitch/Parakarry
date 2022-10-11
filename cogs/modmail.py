@@ -1,4 +1,5 @@
 import asyncio
+from code import interact
 import logging
 import re
 import time
@@ -12,6 +13,7 @@ import pymongo
 from discord import app_commands
 from discord.ext import commands
 
+import exceptions
 import cogs.utils as utils
 
 
@@ -33,7 +35,9 @@ class Mail(commands.Cog):
         self.closeQueue = {}
 
         self.openContextMenu = app_commands.ContextMenu(name='Open a Modmail', callback=self._open_context)
+        self.reportContextMenu = app_commands.ContextMenu(name='Report this Message', callback=self._message_report)
         self.bot.tree.add_command(self.openContextMenu, guild=discord.Object(id=config.guild))
+        self.bot.tree.add_command(self.reportContextMenu, guild=discord.Object(id=config.guild))
 
     @app_commands.command(name='close', description='Closes a modmail thread, optionally with a delay')
     @app_commands.describe(delay='The delay for the modmail to close, in 1w2d3h4m5s format')
@@ -169,7 +173,9 @@ class Mail(commands.Cog):
 
         embed = discord.Embed(title='Moderator message', description=content, color=0x7ED321)
         if not anonymous:
-            embed.set_author(name=f'{interaction.user} ({interaction.user.id})', icon_url=interaction.user.avatar.url)
+            embed.set_author(
+                name=f'{interaction.user} ({interaction.user.id})', icon_url=interaction.user.display_avatar.url
+            )
 
         else:
             embed.title = '[ANON] Moderator message'
@@ -202,7 +208,9 @@ class Mail(commands.Cog):
                             'id': str(interaction.user.id),
                             'name': interaction.user.name,
                             'discriminator': interaction.user.discriminator,
-                            'avatar_url': str(interaction.user.avatar.with_static_format('png').with_size(1024)),
+                            'avatar_url': str(
+                                interaction.user.display_avatar.with_static_format('png').with_size(1024)
+                            ),
                             'mod': True,
                         },
                         'attachments': [replyMessage.attachments[0].url] if replyMessage.attachments else [],
@@ -254,6 +262,34 @@ class Mail(commands.Cog):
         await interaction.response.send_message(
             f':white_check_mark: Modmail has been opened with {member}', ephemeral=True
         )
+
+    async def _message_report(self, interaction: discord.Interaction, message: discord.Message):
+        if message.author.bot:
+            return await interaction.response.send_message(
+                ':x: You cannot report messages sent by bots', ephemeral=True
+            )
+
+        try:
+            dmOpened = await self._user_create_thread(message, interaction)
+
+        except exceptions.ModmailBlacklisted:
+            return await interaction.response.send_message(
+                'Sorry, I cannot create a message report because you are currently blacklisted. '
+                'You may DM a moderator if you still need to contact a Discord staff member.',
+                ephemeral=True,
+            )
+
+        if dmOpened:
+            return await interaction.response.send_message(
+                'Thank you for the report, a moderator will review it soon. If you have any additional information to add you can send me a direct message and I will forward it to the moderators.',
+                ephemeral=True,
+            )
+
+        else:
+            return await interaction.response.send_message(
+                'Thank you for the report. Since your direct messages are disabled, you will not be able to receive any followup messages from moderators. If you do wish to be notified about updates to this report, please turn them on.',
+                ephemeral=True,
+            )
 
     appeal_group = app_commands.Group(
         name='appeal',
@@ -522,22 +558,82 @@ class Mail(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
-        attachments = [x.url for x in message.attachments]
-        ctx = await self.bot.get_context(message)
 
+        if message.channel.type != discord.ChannelType.private:
+            return
+
+        try:
+            await self._user_create_thread(message)
+
+        except exceptions.InvalidType:
+            logging.error(
+                f'Got an invalid MessageType via DM: {message.type} by {message.author} ({message.author.id})'
+            )
+
+        except exceptions.ModmailBlacklisted:
+            return await message.author.send(
+                'Sorry, I cannot create a new modmail thread because you are currently blacklisted. '
+                'You may DM a moderator if you still need to contact a Discord staff member.'
+            )
+
+    def _format_message_embed(
+        self, message: discord.Message, attachments: list, interaction: discord.Interaction = None
+    ):
         if message.content:
             content = message.content
+
         elif message.stickers:
             content = "\n".join([f'*Sent a sticker: {sticker.name}*' for sticker in message.stickers])
+
         else:
             content = '*No message content.*'
 
+        embed = discord.Embed(
+            title='Message reported' if interaction else 'New message',
+            description=content,
+            color=0xF381FD if interaction else 0x32B6CE,
+        )
+        embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.display_avatar.url)
+
+        if not interaction:
+            embed.set_footer(text=f'{message.channel.id}/{message.id}')
+
+        else:
+            embed.add_field(name='Message link', value=message.jump_url)
+
+        if message.stickers:
+            embed.set_image(url=message.stickers[0].url)
+
+        if len(attachments) > 1:  # More than one attachment, use fields
+            for x in range(len(attachments)):
+                embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
+
+        elif attachments and re.search(
+            r'\.(gif|jpe?g|tiff|png|webp)$', str(attachments[0]), re.IGNORECASE
+        ):  # One attachment, image
+            embed.set_image(url=attachments[0])
+
+        elif attachments:  # Still have an attachment, but not an image
+            embed.add_field(name=f'Attachment', value=attachments[0])
+
+        return content, embed
+
+    async def _user_create_thread(self, message: discord.Message, interaction: discord.Interaction = None):
+        successfulDM = False
+        attachments = [x.url for x in message.attachments]
+        ctx = await self.bot.get_context(message)
+
+        if message.type not in [discord.MessageType.default, discord.MessageType.reply]:
+            raise exceptions.InvalidType
+
         # Do something to check category, and add message to log
-        if message.channel.type == discord.ChannelType.private:
-            # User has sent a DM -- check
+        if message.channel.type == discord.ChannelType.private or interaction:
+            # User has sent a message -- check
             db = mclient.modmail.logs
-            thread = db.find_one({'recipient.id': str(message.author.id), 'open': True})
+            reporter = message.author if not interaction else interaction.user
+            thread = db.find_one({'recipient.id': str(reporter.id), 'open': True})
             if thread:
+                successfulDM = True
                 if thread['_id'] in self.closeQueue.keys():  # Thread close was scheduled, cancel due to response
                     self.closeQueue[thread['_id']].cancel()
                     self.closeQueue.pop(thread['_id'], None)
@@ -545,25 +641,7 @@ class Mail(commands.Cog):
                         'Thread closure has been canceled because the user has sent a message'
                     )
 
-                description = content
-                embed = discord.Embed(title='New message', description=description, color=0x32B6CE)
-                embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.avatar.url)
-                embed.set_footer(text=f'{message.channel.id}/{message.id}')
-                if message.stickers:
-                    embed.set_image(url=message.stickers[0].url)
-
-                if len(attachments) > 1:  # More than one attachment, use fields
-                    for x in range(len(attachments)):
-                        embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
-
-                elif attachments and re.search(
-                    r'\.(gif|jpe?g|tiff|png|webp)$', str(attachments[0]), re.IGNORECASE
-                ):  # One attachment, image
-                    embed.set_image(url=attachments[0])
-
-                elif attachments:  # Still have an attachment, but not an image
-                    embed.add_field(name=f'Attachment', value=attachments[0])
-
+                content, embed = self._format_message_embed(message, attachments, interaction=interaction)
                 await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
                     embed=embed
                 )
@@ -575,12 +653,14 @@ class Mail(commands.Cog):
                                 'timestamp': str(message.created_at),
                                 'message_id': str(message.id),
                                 'content': content,
-                                'type': 'thread_message',
+                                'type': 'report' if interaction else 'thread_message',
                                 'author': {
                                     'id': str(message.author.id),
                                     'name': message.author.name,
                                     'discriminator': message.author.discriminator,
-                                    'avatar_url': str(message.author.avatar.with_static_format('png').with_size(1024)),
+                                    'avatar_url': str(
+                                        message.author.display_avatar.with_static_format('png').with_size(1024)
+                                    ),
                                     'mod': False,
                                 },
                                 'attachments': [x.url for x in message.stickers] + attachments,
@@ -590,38 +670,17 @@ class Mail(commands.Cog):
                 )
 
             else:
-                try:
-                    thread = await utils._trigger_create_user_thread(self.bot, message.author, message, 'user')
-                except RuntimeError as e:
-                    logging.critical(
-                        f'Exception thrown when calling utils._trigger_create_user_thread() with user {message.author.id}: %s',
-                        e,
-                    )
-                    return
-
-                # TODO: Don't duplicate message embed code based on new thread or just new message
-                embed = discord.Embed(title='New message', description=content, color=0x32B6CE)
-                embed.set_author(
-                    name=f'{message.author} ({message.author.id})',
-                    icon_url=message.author.avatar.with_static_format('png').with_size(1024),
+                thread, successfulDM = await utils._trigger_create_user_thread(
+                    self.bot, message.author if not interaction else interaction.user, message, 'user'
                 )
-                embed.set_footer(text=f'{message.channel.id}/{message.id}')
 
-                if len(attachments) > 1:  # More than one attachment, use fields
-                    for x in range(len(attachments)):
-                        embed.add_field(name=f'Attachment {x + 1}', value=attachments[x])
-
-                elif attachments and re.search(
-                    r'\.(gif|jpe?g|tiff|png|webp)$', str(attachments[0]), re.IGNORECASE
-                ):  # One attachment, image
-                    embed.set_image(url=attachments[0])
-
-                elif attachments:  # Still have an attachment, but not an image
-                    embed.add_field(name=f'Attachment', value=attachments[0])
-
+                content, embed = self._format_message_embed(message, attachments, interaction=interaction)
                 await thread.send(embed=embed)
 
-            await message.add_reaction('✅')
+            if not interaction:
+                await message.add_reaction('✅')
+
+            return successfulDM
 
         elif message.channel.category_id == config.category:
             db = mclient.modmail.logs
@@ -642,7 +701,7 @@ class Mail(commands.Cog):
                                         'name': message.author.name,
                                         'discriminator': message.author.discriminator,
                                         'avatar_url': str(
-                                            message.author.avatar.with_static_format('png').with_size(1024)
+                                            message.author.display_avatar.with_static_format('png').with_size(1024)
                                         ),
                                         'mod': True,
                                     },
