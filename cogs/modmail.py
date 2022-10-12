@@ -289,10 +289,13 @@ class Mail(commands.Cog):
                 ephemeral=True,
             )
 
-    appeal_group = app_commands.Group(
+    @app_commands.guilds(discord.Object(id=config.guild))
+    class GuildGroupCommand(app_commands.Group):
+        pass
+
+    appeal_group = GuildGroupCommand(
         name='appeal',
         description='Make a decision to accept or deny a ban appeal',
-        guild_only=True,
         default_permissions=discord.Permissions(view_audit_log=True),
     )
 
