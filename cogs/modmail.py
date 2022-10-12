@@ -545,10 +545,11 @@ class Mail(commands.Cog):
         if message.author.bot:
             return
 
-        if message.channel.type != discord.ChannelType.private:
+        if message.channel.type not in [discord.ChannelType.private, discord.ChannelType.text]:
             return
 
         try:
+            logging.info(message.content)
             await self._user_create_thread(message)
 
         except exceptions.InvalidType:
@@ -684,7 +685,7 @@ class Mail(commands.Cog):
                                 'messages': {
                                     'timestamp': str(message.created_at),
                                     'message_id': str(message.id),
-                                    'content': content,
+                                    'content': message.content,
                                     'type': 'internal',
                                     'author': {
                                         'id': str(message.author.id),
