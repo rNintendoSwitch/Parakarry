@@ -552,7 +552,6 @@ class Mail(commands.Cog):
             return
 
         try:
-            logging.info(message.content)
             await self._user_create_thread(message)
 
         except exceptions.InvalidType:
