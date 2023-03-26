@@ -673,6 +673,15 @@ class Mail(commands.Cog):
             if not interaction:
                 await message.add_reaction('✅')
 
+            if successfulDM and interaction:
+                try:
+                    reportConfirm = await interaction.user.send(
+                        f'*You reported a message from {message.author}: <{message.jump_url}>*'
+                    )
+                    await reportConfirm.add_reaction('✅')
+                except discord.Forbidden:
+                    pass
+
             return successfulDM
 
         elif message.channel.category_id == config.category:
