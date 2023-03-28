@@ -43,7 +43,6 @@ class Mail(commands.Cog):
     @app_commands.guilds(discord.Object(id=config.guild))
     @app_commands.default_permissions(view_audit_log=True)
     async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str]):
-
         message, ephemeral = await self._close_generic(interaction.user, interaction.guild, interaction.channel, delay)
 
         if message:
@@ -96,7 +95,6 @@ class Mail(commands.Cog):
         content: app_commands.Range[str, None, 1800],
         attachment: typing.Optional[discord.Attachment],
     ):
-
         await self._reply(interaction, content, attachment)
 
     @app_commands.command(name='areply', description='Replys to a modmail, anonymously')
@@ -110,7 +108,6 @@ class Mail(commands.Cog):
         content: app_commands.Range[str, None, 1800],
         attachment: typing.Optional[discord.Attachment],
     ):
-
         await self._reply(interaction, content, attachment, True)
 
     async def _reply(self, interaction: discord.Interaction, content, attachment, anonymous=False):
@@ -302,7 +299,6 @@ class Mail(commands.Cog):
     @appeal_group.command(name='accept', description='Accept a user\'s ban appeal')
     @app_commands.describe(reason='Why are you accepting this appeal?')
     async def _appeal_accept(self, interaction: discord.Interaction, reason: app_commands.Range[str, None, 990]):
-
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
@@ -381,7 +377,6 @@ class Mail(commands.Cog):
     async def _appeal_deny(
         self, interaction: discord.Interaction, next_attempt: str, reason: app_commands.Range[str, None, 990]
     ):
-
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
@@ -672,6 +667,15 @@ class Mail(commands.Cog):
 
             if not interaction:
                 await message.add_reaction('✅')
+
+            if successfulDM and interaction:
+                try:
+                    reportConfirm = await interaction.user.send(
+                        f'*You reported a message from {message.author}: <{message.jump_url}>*'
+                    )
+                    await reportConfirm.add_reaction('✅')
+                except discord.Forbidden:
+                    pass
 
             return successfulDM
 
