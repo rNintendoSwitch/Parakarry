@@ -516,10 +516,16 @@ class Mail(commands.Cog):
             ):
                 return
 
-            await member.send(
-                'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not banned'
-            )
-            await member.kick(reason='Not banned on /r/NintendoSwitch')
+            try:
+                await member.send(
+                    'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you are not currently banned.\n\nDiscord also prevents you from joining if another account was banned from our server with the same IP or phone number as you. If you still can\'t join, you will need to submit an appeal from the other account that was banned.'
+                )
+
+            except:
+                pass
+
+            finally:
+                await member.kick(reason='Not banned on /r/NintendoSwitch')
 
         await utils._can_appeal(member)
 
