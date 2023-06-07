@@ -258,7 +258,12 @@ async def _close_thread(
     embed = discord.Embed(
         description=config.logUrl + doc['_id'], color=0xB8E986, timestamp=datetime.now(tz=timezone.utc)
     )
-    embed.set_author(name=f'Modmail closed | {user} ({user["id"]})')
+
+    if user["discriminator"] == "0":
+        embed.set_author(name=f'Modmail closed | {user["name"]} ({user["id"]})')
+    else:
+        embed.set_author(name=f'Modmail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
+
     embed.add_field(name='User', value=f'<@{user["id"]}>', inline=True)
     embed.add_field(name='Moderator', value=f'{mod_user.mention}', inline=True)
     await target_channel.send(embed=embed)
