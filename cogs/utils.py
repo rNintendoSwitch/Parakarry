@@ -258,7 +258,7 @@ async def _close_thread(
     embed = discord.Embed(
         description=config.logUrl + doc['_id'], color=0xB8E986, timestamp=datetime.now(tz=timezone.utc)
     )
-    embed.set_author(name=f'Modmail closed | {user["name"]}#{user["discriminator"]} ({user["id"]})')
+    embed.set_author(name=f'Modmail closed | {user} ({user["id"]})')
     embed.add_field(name='User', value=f'<@{user["id"]}>', inline=True)
     embed.add_field(name='Moderator', value=f'{mod_user.mention}', inline=True)
     await target_channel.send(embed=embed)
@@ -302,7 +302,7 @@ async def _trigger_create_user_thread(
             raise exceptions.ModmailBlacklisted
 
     category = guild.get_channel(config.category)
-    channelName = f'{member.name}-{member.discriminator}'
+    channelName = member.name if member.discriminator == '0' else f'{member.name}-{member.discriminator}'
     if banAppeal:
         channelName = '🔨-' + channelName
     channel = await category.create_text_channel(channelName, reason='New modmail opened')
@@ -392,7 +392,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
         raise RuntimeError('Invalid user')  # TODO: We need custom exceptions
 
     category = guild.get_channel(config.category)
-    channelName = f'{member.name}-{member.discriminator}'
+    channelName = member.name if member.discriminator == '0' else f'{member.name}-{member.discriminator}'
     channel = await category.create_text_channel(channelName, reason='New modmail opened')
 
     embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
