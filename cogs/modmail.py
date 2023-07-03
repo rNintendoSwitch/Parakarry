@@ -493,13 +493,21 @@ class Mail(commands.Cog):
     async def on_member_join(self, member):
         db = mclient.modmail.logs
         thread = db.find_one({'recipient.id': str(member.id), 'open': True})
-        if thread:
-            await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
-                f'**{member}** has rejoined the server, thread closure has been canceled'
-            )
-            if not thread['ban_appeal']:
+        if thread:  # Check if a thread is open
+            if (
+                member.guild.id == config.guild and thread['_id'] in self.closeQueue.keys()
+            ):  # Standard thread and pending closure
+                await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
+                    f'**{member}** has rejoined the server, thread closure has been canceled'
+                )
+
                 self.closeQueue[thread['_id']].cancel()
                 self.closeQueue.pop(thread['_id'], None)
+
+            else:  # Appeals don't have close delays
+                await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
+                    f'**{member}** has rejoined the appeal server'
+                )
 
         if member.guild.id != config.appealGuild:  # Return if guild not the appeal server
             return
