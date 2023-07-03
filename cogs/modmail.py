@@ -498,13 +498,13 @@ class Mail(commands.Cog):
                 member.guild.id == config.guild and thread['_id'] in self.closeQueue.keys()
             ):  # Standard thread and pending closure
                 await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
-                    f'**{member}** has rejoined the server, thread closure has been canceled'
+                    f'**{member}** has joined the server, thread closure has been canceled'
                 )
 
                 self.closeQueue[thread['_id']].cancel()
                 self.closeQueue.pop(thread['_id'], None)
 
-            else:  # Appeals don't have close delays
+            elif thread['ban_appeal']:  # Appeals don't have close delays
                 await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
                     f'**{member}** has rejoined the appeal server'
                 )
@@ -544,13 +544,17 @@ class Mail(commands.Cog):
         thread = db.find_one({'recipient.id': str(member.id), 'open': True})
         if thread:
             channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
-            await channel.send(f'**{member}** has left the server')
 
-            if not thread['ban_appeal']:
+            if member.guild.id == config.guild:
                 msg, _ = await self._close_generic(member, member.guild, channel, '4h')
 
                 if msg:
-                    channel.send(msg)
+                    await channel.send(f'**{member}** has left the server. {msg}')
+
+            elif (
+                thread['ban_appeal'] and member.guild.id == config.appealGuild
+            ):  # We only care about appeal leaves if they had an appeal thread
+                await channel.send(f'**{member}** has left the server')
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
