@@ -252,7 +252,7 @@ class Mail(commands.Cog):
 
         except discord.Forbidden:
             return await interaction.followup.send(
-                f'Failed to DM {member.mention}, this could be because their DMs are disabled or they have blocked me. Thread open action canceled'
+                f':x: Failed to DM {member.mention}, this could be because their DMs are disabled or they have blocked me. Thread open action canceled'
             )
 
         await interaction.followup.send(f':white_check_mark: Modmail has been opened with {member}')
