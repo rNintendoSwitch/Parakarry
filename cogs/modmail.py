@@ -255,7 +255,7 @@ class Mail(commands.Cog):
                 f'Failed to DM {member.mention}, this could be because their DMs are disabled or they have blocked me. Thread open action canceled'
             )
 
-        await interaction.response.send_message(f':white_check_mark: Modmail has been opened with {member}')
+        await interaction.followup.send(f':white_check_mark: Modmail has been opened with {member}')
 
     async def _message_report(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True)
