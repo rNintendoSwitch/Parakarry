@@ -224,6 +224,7 @@ class Mail(commands.Cog):
         Open a modmail thread with a user
         """
 
+        await interaction.response.defer()
         await self._open_thread(interaction, member)
 
     async def _open_context(self, interaction: discord.Interaction, member: discord.Member):
@@ -255,9 +256,7 @@ class Mail(commands.Cog):
         except discord.Forbidden:
             return
 
-        await interaction.response.send_message(
-            f':white_check_mark: Modmail has been opened with {member}', ephemeral=True
-        )
+        await interaction.response.send_message(f':white_check_mark: Modmail has been opened with {member}')
 
     async def _message_report(self, interaction: discord.Interaction, message: discord.Message):
         await interaction.response.defer(ephemeral=True)
