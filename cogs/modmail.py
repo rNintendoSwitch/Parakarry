@@ -240,21 +240,20 @@ class Mail(commands.Cog):
         """
 
         if member.bot:
-            return await interaction.response.send_message(
-                ':x: Modmail threads cannot be opened with bot accounts', ephemeral=True
-            )
+            return await interaction.followup.send(':x: Modmail threads cannot be opened with bot accounts')
 
         if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
-            return await interaction.response.send_message(
-                ':x: Unable to open modmail to user -- there is already a thread involving them currently open',
-                ephemeral=True,
+            return await interaction.followup.send(
+                ':x: Unable to open modmail to user -- there is already a thread involving them currently open'
             )
 
         try:
             await utils._trigger_create_mod_thread(self.bot, interaction.guild, member, interaction.user)
 
         except discord.Forbidden:
-            return
+            return await interaction.followup.send(
+                f'Failed to DM {member.mention}, this could be because their DMs are disabled or they have blocked me. Thread open action canceled'
+            )
 
         await interaction.response.send_message(f':white_check_mark: Modmail has been opened with {member}')
 

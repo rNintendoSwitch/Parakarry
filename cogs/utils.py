@@ -443,9 +443,6 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
         # Cleanup if there really was an issue messaging the user, i.e. bot blocked
         db.delete_one({'_id': docID})
         await channel.delete()
-        await bot.get_channel(config.adminChannel).send(
-            f'Failed to DM {member.mention} for modmail thread created by {moderator.mention}. Thread open action canceled'
-        )
         raise
 
     embed = discord.Embed(
