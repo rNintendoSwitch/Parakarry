@@ -181,7 +181,7 @@ class Mail(commands.Cog):
             )
 
         if attachment and re.search(
-            r'\.(gif|jpe?g|tiff|png|webp)$', str(attachment), re.IGNORECASE
+            r'\.(gif|jpe?g|tiff|png|webp)(\?[a-zA-Z0-9#-_]*)?$', str(attachment), re.IGNORECASE
         ):  # One attachment, image
             embed.set_image(url=replyMessage.attachments[0].url)
 
