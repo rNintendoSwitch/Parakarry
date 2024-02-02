@@ -369,7 +369,7 @@ class Mail(commands.Cog):
 
     @appeal_group.command(name='deny', description='Deny a user\'s ban appeal')
     @app_commands.describe(
-        next_attempt='The amount of time until the user can appeal again, in 1w2d3h4m5s format',
+        next_attempt='The amount of time until the user can appeal again, in 1w2d3h4m5s format. You can also pass \'permanent\'.',
         reason='Why are you denying this appeal?',
     )
     async def _appeal_deny(
@@ -383,13 +383,26 @@ class Mail(commands.Cog):
         if not doc:
             return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
 
+        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         try:
             delayDate = utils.resolve_duration(next_attempt)
+            if delayDate != None:
+                # We need a timestamp if this will expire
+                delayDate = int(delayDate.timestamp())
+                humanizedTimestamp = f'until <t:{delayDate}:f>'
+                durationUserStr = f'You may appeal again after __<t:{delayDate}:f> (approximately <t:{delayDate}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
+
+            else:
+                if punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2:
+                    # User has not met the minimum appeal denials to be permanently denied
+                    return await interaction.response.send_message(':x: To permanently deny a ban appeal, the user must have been denied at least 2 times previously')
+
+                humanizedTimestamp = 'permanently'
+                durationUserStr = f'You are not eligible to submit any further appeals for your ban; this decision is final. Please note, it is a [violation of the Discord Community Guidelines](https://discord.com/guidelines/) to use another account to evade this ban and doing so may result in Discord taking action against your account(s), including account termination.'
 
         except KeyError:
             return await interaction.response.send_message('Invalid duration')
 
-        user = await self.bot.fetch_user(int(doc['recipient']['id']))
         docID = str(uuid.uuid4())
         while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
@@ -403,34 +416,34 @@ class Mail(commands.Cog):
                 'type': 'appealdeny',
                 'timestamp': int(time.time()),
                 'reason': reason,
-                'expiry': int(delayDate.timestamp()),
+                'expiry': delayDate,
                 'context': 'banappeal',
                 'active': True,
             }
         )
 
         embed = discord.Embed(color=0x4A90E2, timestamp=datetime.now(tz=timezone.utc))
-        embed.set_author(name=f'Ban appeal denied | {user}')
+        embed.set_author(name=f'Ban appeal denied | {user} ({user.id})')
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
-        embed.add_field(name='Next appeal in', value=f'<t:{int(delayDate.timestamp())}:R>')
+        embed.add_field(name='Next appeal in', value='Never' if delayDate == None else f'<t:{delayDate}:R>')
         embed.add_field(name='Reason', value=reason)
         await self.bot.get_channel(config.modLog).send(embed=embed)
 
         try:
             await user.send(
-                f'The moderators have decided to **uphold your ban** on the {interaction.guild} Discord and your ban appeal thread has been closed. You may appeal again after __<t:{int(delayDate.timestamp())}:f> (approximately <t:{int(delayDate.timestamp())}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
+                f'The moderators have decided to **uphold your ban** on the {interaction.guild} Discord and your ban appeal thread has been closed. {durationUserStr}'
             )
 
         except:
             await self.bot.get_channel(config.adminChannel).send(
-                f':warning: The ban appeal for {user} has been denied by {interaction.user} until <t:{int(delayDate.timestamp())}:f>, but I was unable to DM them the decision'
+                f':warning: The ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}, but I was unable to DM them the decision'
             )
 
         else:
             await self.bot.get_channel(config.adminChannel).send(
-                f':white_check_mark: The ban appeal for {user} has been denied by {interaction.user} until <t:{int(delayDate.timestamp())}:f>'
+                f':white_check_mark: The ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}'
             )
 
         finally:
@@ -445,7 +458,11 @@ class Mail(commands.Cog):
             )
             try:
                 member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
-                await member.kick(reason='Failed appeal')
+                if delayDate:
+                    await member.kick(reason='Failed appeal')
+
+                else:
+                    await member.ban(reason='Failed appeal, permanent denial')
 
             except:
                 return

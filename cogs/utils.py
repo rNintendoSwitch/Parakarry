@@ -52,6 +52,10 @@ def resolve_duration(data):
         raise KeyError('No time units provided')
 
     except ValueError:
+        if data.lower() in ['perm', 'permanent', 'forever']:
+            # Never expires, so we aren't going to grab a timestamp
+            return None
+
         pass
 
     for char in data:
@@ -114,14 +118,20 @@ async def _can_appeal(member):
     db = mclient.bowser.puns
     pun = db.find_one({'user': member.id, 'type': 'appealdeny', 'active': True})
     if pun:
-        if pun['expiry'] > datetime.now(tz=timezone.utc).timestamp():
-            try:
-                expiry = datetime.fromtimestamp(pun['expiry'], tz=timezone.utc)
+        try:
+            if pun['expiry'] == None:
                 await member.send(
-                    f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __<t:{int(expiry.timestamp())}:f> (approximately <t:{int(expiry.timestamp())}:R>)__ to submit a new appeal with the following invite link: {config.appealInvite}\n\nReason given by moderators:\n```{pun["reason"]}```'
-                )
+                        f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal. \n\nReason given by moderators:\n```{pun["reason"]}```'
+                    )
+            
+            elif pun['expiry'] > datetime.now(tz=timezone.utc).timestamp():
+                    expiry = datetime.fromtimestamp(pun['expiry'], tz=timezone.utc)
+                    await member.send(
+                        f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __<t:{int(expiry.timestamp())}:f> (approximately <t:{int(expiry.timestamp())}:R>)__ to submit a new appeal with the following invite link: {config.appealInvite}\n\nReason given by moderators:\n```{pun["reason"]}```'
+                    )
 
-            finally:
+        finally:
+            if pun['expiry'] > datetime.now(tz=timezone.utc).timestamp():
                 await member.kick(reason='Not ready to appeal again')
                 return False
 
