@@ -395,7 +395,9 @@ class Mail(commands.Cog):
             else:
                 if punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2:
                     # User has not met the minimum appeal denials to be permanently denied
-                    return await interaction.response.send_message(':x: To permanently deny a ban appeal, the user must have been denied at least 2 times previously')
+                    return await interaction.response.send_message(
+                        ':x: To permanently deny a ban appeal, the user must have been denied at least 2 times previously'
+                    )
 
                 humanizedTimestamp = 'permanently'
                 durationUserStr = f'You are not eligible to submit any further appeals for your ban; this decision is final. Please note, it is a [violation of the Discord Community Guidelines](https://discord.com/guidelines/) to use another account to evade this ban and doing so may result in Discord taking action against your account(s), including account termination.'
