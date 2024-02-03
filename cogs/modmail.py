@@ -353,7 +353,7 @@ class Mail(commands.Cog):
         finally:
             await utils._close_thread(
                 self.bot,
-                user,
+                interaction.user,
                 None,
                 interaction.channel,
                 self.bot.get_channel(config.modLog),
@@ -451,7 +451,7 @@ class Mail(commands.Cog):
         finally:
             await utils._close_thread(
                 self.bot,
-                user,
+                interaction.user,
                 None,
                 interaction.channel,
                 self.bot.get_channel(config.modLog),
