@@ -1,4 +1,4 @@
-discord.py
+discord.py[srv]
 pymongo
 jishaku
 pylint
