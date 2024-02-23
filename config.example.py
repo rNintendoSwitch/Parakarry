@@ -4,9 +4,7 @@
 token = 'token'
 
 # Mongo Credentials
-mongoUser = 'user'
-mongoPass = 'password'
-mongoHost = 'host'
+mongoURI = 'MongoDB URI'
 
 # Channel IDs
 modLog: int = mod_log_channel_id
