@@ -35,7 +35,6 @@ class Parakarry(commands.Bot):
 
     async def setup_hook(self):
         await self.load_extension('jishaku')
-        await self.load_extension('cogs.modmail')
 
     async def on_ready(self):
         logging.info(f'Parakarry ModMail Bot - Now Logged in as {self.user} ({self.user.id})')
@@ -43,6 +42,8 @@ class Parakarry(commands.Bot):
         for g in self.guilds:
             await g.chunk(cache=True)
             logging.info(f'Chunked members for guild: {g.name} ({g.id})')
+
+        await self.load_extension('cogs.modmail')
 
 
 asyncio.run(Parakarry().start(config.token))

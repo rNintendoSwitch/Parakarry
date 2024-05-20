@@ -33,6 +33,8 @@ class Mail(commands.Cog):
         self.bot = bot
         self.closeQueue = {}
 
+        self.leadModRole = self.bot.get_guild(config.guild).get_role(config.leadModRole)
+
         self.openContextMenu = app_commands.ContextMenu(name='Open a Modmail', callback=self._open_context)
         self.reportContextMenu = app_commands.ContextMenu(name='Report this Message', callback=self._message_report)
         self.bot.tree.add_command(self.openContextMenu, guild=discord.Object(id=config.guild))
@@ -148,7 +150,7 @@ class Mail(commands.Cog):
             elif interaction.guild.owner == interaction.user:
                 responsibleModerator = f'*(Server Owner)* **{interaction.user}**'
 
-            elif self.bot.get_guild(config.guild).get_role(config.leadModRole) in interaction.user.roles:
+            elif self.leadModRole in interaction.user.roles:
                 responsibleModerator = f'*(Lead Moderator)* **{interaction.user}**'
 
             else:
@@ -393,7 +395,7 @@ class Mail(commands.Cog):
                 durationUserStr = f'You may appeal again after __<t:{delayDate}:f> (approximately <t:{delayDate}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
 
             else:
-                if punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2:
+                if self.leadModRole not in interaction.user.roles and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2:
                     # User has not met the minimum appeal denials to be permanently denied
                     return await interaction.response.send_message(
                         ':x: To permanently deny a ban appeal, the user must have been denied at least 2 times previously'
