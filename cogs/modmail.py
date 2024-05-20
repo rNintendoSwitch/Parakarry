@@ -395,7 +395,10 @@ class Mail(commands.Cog):
                 durationUserStr = f'You may appeal again after __<t:{delayDate}:f> (approximately <t:{delayDate}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
 
             else:
-                if self.leadModRole not in interaction.user.roles and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2:
+                if (
+                    self.leadModRole not in interaction.user.roles
+                    and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2
+                ):
                     # User has not met the minimum appeal denials to be permanently denied
                     return await interaction.response.send_message(
                         ':x: To permanently deny a ban appeal, the user must have been denied at least 2 times previously'
