@@ -271,9 +271,7 @@ async def _close_thread(
 
     user = doc['recipient']
 
-    embed = discord.Embed(
-        description=thread_channel.jump_url, color=0xB8E986, timestamp=datetime.now(tz=timezone.utc)
-    )
+    embed = discord.Embed(description=thread_channel.jump_url, color=0xB8E986, timestamp=datetime.now(tz=timezone.utc))
 
     embed.set_author(name=f'Modmail closed | {user["name"]} ({user["id"]})')
 
