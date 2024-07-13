@@ -44,27 +44,40 @@ class Mail(commands.Cog):
     @app_commands.describe(delay='The delay for the modmail to close, in 1w2d3h4m5s format')
     @app_commands.guilds(discord.Object(id=config.guild))
     @app_commands.default_permissions(view_audit_log=True)
-    async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str]):
-        message, ephemeral = await self._close_generic(interaction.user, interaction.guild, interaction.channel, delay)
+    async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str], auto: bool = False):
+        if not delay:
+            await interaction.response.send_message(f'This thread has been closed by {interaction.user}. Use `/open` to send any followup messages to this user.')
 
-        if message:
-            await interaction.response.send_message(message, ephemeral=ephemeral)
+        else:
+            await interaction.response.defer()
+
+        try:
+            scheduledTime = await self._close_generic(interaction.user, interaction.guild, interaction.channel, delay)
+
+        except exceptions.InvalidDuration:
+            await interaction.followup.send('Invalid duration passed', ephemeral=True)
+
+        except exceptions.NotAModmail:
+            await interaction.followup.send('This is not a modmail channel!', ephemeral=True)
+
+        except exceptions.InvalidType:
+            await interaction.followup.send(':x: Ban appeals cannot be closed with the `/close` command. Use `/appeal accept` or `/appeal deny` instead', ephemeral=True)
+
+        if delay:
+            await interaction.followup.send(f'Thread has been scheduled to be closed {scheduledTime} by {interaction.user}. Once closed, use `/open` to send any followup messages to this user.')
 
     async def _close_generic(self, user, guild, channel, delay):
         db = mclient.modmail.logs
         doc = db.find_one({'channel_id': str(channel.id), 'open': True})
 
         if not doc:
-            return 'This is not a modmail channel!', True
+            raise exceptions.NotAModmail
 
         if doc['_id'] in self.closeQueue:
             self.closeQueue[doc['_id']].cancel()
 
         if doc['ban_appeal']:
-            return (
-                ':x: Ban appeals cannot be closed with the `/close` command. Use `/appeal accept` or `/appeal deny` instead',
-                False,
-            )
+            raise exceptions.InvalidType
 
         if delay:
             try:
@@ -72,7 +85,7 @@ class Mail(commands.Cog):
                 delayTime = delayDate.timestamp() - datetime.now(tz=timezone.utc).timestamp()
 
             except KeyError:
-                return 'Invalid duration', False
+                raise exceptions.InvalidDuration
 
             event_loop = self.bot.loop
             close_action = event_loop.call_later(
@@ -81,10 +94,10 @@ class Mail(commands.Cog):
                 utils._close_thread(self.bot, user, guild, channel, self.bot.get_channel(config.modLog)),
             )
             self.closeQueue[doc['_id']] = close_action
-            return f'Thread scheduled to be closed <t:{int(delayDate.timestamp())}:R>', False
-
-        await utils._close_thread(self.bot, user, guild, channel, self.bot.get_channel(config.modLog))
-        return None, False
+            return f'<t:{int(delayDate.timestamp())}:R>'
+        
+        else:
+            await utils._close_thread(self.bot, user, guild, channel, self.bot.get_channel(config.modLog))
 
     @app_commands.command(name='reply', description='Replys to a modmail, with your username')
     @app_commands.describe(content='The message to send to the user')
@@ -234,6 +247,7 @@ class Mail(commands.Cog):
         Open a modmail thread with a user
         """
 
+        await interaction.response.defer()
         await self._open_thread(interaction, member)
 
     async def _open_thread(self, interaction: discord.Interaction, member: discord.Member):
@@ -265,7 +279,7 @@ class Mail(commands.Cog):
             return await interaction.followup.send(':x: You cannot report messages sent by bots', ephemeral=True)
 
         try:
-            dmOpened = await self._user_create_thread(message, interaction)
+            dmOpened = await self._user_create_thread(message, interaction, menu_interacted=True)
 
         except exceptions.ModmailBlacklisted:
             return await interaction.followup.send(
@@ -307,6 +321,8 @@ class Mail(commands.Cog):
         if not doc:
             return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
 
+        await interaction.response.defer()
+
         user = await self.bot.fetch_user(int(doc['recipient']['id']))
         punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
         punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
@@ -343,13 +359,13 @@ class Mail(commands.Cog):
             )
 
         except:
-            await self.bot.get_channel(config.adminChannel).send(
-                f':warning: The ban appeal for {user} has been accepted by {interaction.user}, but I was unable to DM them the decision'
+            await interaction.followup.send(
+                f':warning: This ban appeal for {user} has been accepted by {interaction.user}, but I was unable to DM them the decision.'
             )
 
         else:
-            await self.bot.get_channel(config.adminChannel).send(
-                f':white_check_mark: The ban appeal for {user} has been accepted by {interaction.user}'
+            await interaction.followup.send(
+                f':white_check_mark: This ban appeal for {user} has been accepted by {interaction.user}.'
             )
 
         finally:
@@ -384,6 +400,8 @@ class Mail(commands.Cog):
         doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
         if not doc:
             return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
+
+        await interaction.response.defer()
 
         user = await self.bot.fetch_user(int(doc['recipient']['id']))
         try:
@@ -444,13 +462,13 @@ class Mail(commands.Cog):
             )
 
         except:
-            await self.bot.get_channel(config.adminChannel).send(
-                f':warning: The ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}, but I was unable to DM them the decision'
+            await interaction.followup.send(
+                f':warning: This ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}, but I was unable to DM them the decision.'
             )
 
         else:
-            await self.bot.get_channel(config.adminChannel).send(
-                f':white_check_mark: The ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}'
+            await interaction.followup.send(
+                f':white_check_mark: This ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}.'
             )
 
         finally:
@@ -505,8 +523,8 @@ class Mail(commands.Cog):
         db = mclient.modmail.logs
         thread = db.find_one({'recipient.id': str(member.id), 'open': True})
         if thread:
-            channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
-            await channel.send(f'**{member}** has been banned from the server')
+            channel = self.bot.get_channel(int(thread['channel_id']))
+            await channel.send(f'**{member}** has been banned from the server and this thread is now closed.')
 
             if not thread['ban_appeal']:
                 await self._close_generic(member, member.guild, channel, None)
@@ -568,10 +586,8 @@ class Mail(commands.Cog):
             channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
 
             if member.guild.id == config.guild:
-                msg, _ = await self._close_generic(member, member.guild, channel, '4h')
-
-                if msg:
-                    await channel.send(f'**{member}** has left the server. {msg}')
+                scheduledTime = await self._close_generic(member, member.guild, channel, '4h')
+                await channel.send(f'**{member}** has left the server. Thread scheduled to be closed {scheduledTime}')
 
             elif (
                 thread['ban_appeal'] and member.guild.id == config.appealGuild
@@ -642,7 +658,7 @@ class Mail(commands.Cog):
 
         return content, embed
 
-    async def _user_create_thread(self, message: discord.Message, interaction: discord.Interaction = None):
+    async def _user_create_thread(self, message: discord.Message, interaction: discord.Interaction = None, menu_interacted: bool = False):
         successfulDM = False
         attachments = [x.url for x in message.attachments]
         ctx = await self.bot.get_context(message)
@@ -666,7 +682,7 @@ class Mail(commands.Cog):
                     )
 
                 content, embed = self._format_message_embed(message, attachments, interaction=interaction)
-                await self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id'])).send(
+                await self.bot.get_channel(int(thread['channel_id'])).send(
                     embed=embed
                 )
                 db.update_one(
@@ -698,12 +714,16 @@ class Mail(commands.Cog):
                     self.bot,
                     message.author if not interaction else interaction.user,
                     message,
-                    'user',
+                    'message_report' if menu_interacted else 'user',
                     interaction=interaction,
                 )
 
                 content, embed = self._format_message_embed(message, attachments, interaction=interaction)
-                await thread.send(embed=embed)
+                msgContent = f'<@&{config.modRole}>'
+                if not successfulDM:
+                    msgContent += '\nPlease note, this user\'s DMs are closed. As such, they have been notified when they reported this message that they may not receive a moderator response.'
+
+                await thread.send(content=msgContent, embed=embed, silent=True)
 
             if not interaction:
                 await message.add_reaction('✅')

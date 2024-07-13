@@ -27,6 +27,12 @@ punNames = {
     'note': 'User note',
     'appealdeny': 'Denied ban appeal',
 }
+tagIDS = {
+    'user': config.userThreadTag,
+    'moderator': config.modThreadTag,
+    'ban_appeal': config.banAppealTag,
+    'message_report': config.messageReportTag
+}
 
 
 def resolve_duration(data):
@@ -246,7 +252,7 @@ async def _close_thread(
 
     try:
         channel = bot.get_channel(thread_channel.id)
-        await channel.delete(reason=f'Modmail closed by {mod_user}')
+        await channel.edit(locked=True, archived=True, reason=f'Modmail closed by {mod_user}')
 
     except discord.NotFound:
         pass
@@ -280,11 +286,10 @@ async def _close_thread(
 
 
 async def _trigger_create_user_thread(
-    bot, member, message, open_type, is_mention=False, moderator=None, content=None, anonymous=True, interaction=None
+    bot, member, message, open_type, is_mention=False, moderator=None, content=None, anonymous=True, interaction=None,
 ):
     db = mclient.modmail.logs
     punsDB = mclient.bowser.puns
-    banAppeal = False
     successfulDM = False
 
     guild = bot.get_guild(config.guild)
@@ -294,7 +299,7 @@ async def _trigger_create_user_thread(
 
     except discord.NotFound:
         # If the user is not in the primary guild. Failsafe check in-case on_member_join didn't catch them
-        banAppeal = True
+        open_type = 'ban_appeal'
         try:
             await guild.fetch_ban(member)
 
@@ -312,17 +317,14 @@ async def _trigger_create_user_thread(
                 raise RuntimeError('User cannot appeal')
 
     # Deny thread creation if modmail restricted
-    if open_type == 'user' and not banAppeal:
+    if open_type == 'user':
         if not mclient.bowser.users.find_one({'_id': member.id})['modmail']:
             raise exceptions.ModmailBlacklisted
 
-    category = guild.get_channel(config.category)
-    channelName = member.name if member.discriminator == '0' else f'{member.name}-{member.discriminator}'
-    if banAppeal:
-        channelName = '🔨-' + channelName
-    channel = await category.create_text_channel(channelName, reason='New modmail opened')
-
-    if banAppeal:
+    forum = guild.get_channel(config.forumChannel)
+    postName = member.name + ' - '
+    if open_type == 'ban_appeal':
+        postName += 'Ban Appeal'
         embed = discord.Embed(title='New ban appeal submitted', color=0xEE5F5F)
 
     else:
@@ -334,32 +336,25 @@ async def _trigger_create_user_thread(
     )
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
-    docID = await _create_thread(
-        bot,
-        channel,
-        member if not moderator else moderator,
-        member,
-        is_mention,
-        content=content,
-        is_mod=True if moderator else False,
-        ban_appeal=banAppeal,
-        message=message,
-        report=interaction,
-    )
 
     punsDB = mclient.bowser.puns
     puns = punsDB.find({'user': member.id, 'active': True})
     punsCnt = punsDB.count_documents({'user': member.id, 'active': True})
-    if banAppeal:
-        description = f'A new ban appeal has been submitted by {member} ({member.mention}) and needs to be reviewed'
+    if open_type == 'ban_appeal':
+        description = f'A new ban appeal has been submitted by {member} ({member.mention}) and needs to be reviewed.'
 
     elif open_type == 'moderator':
-        description = f'A modmail thread has been opened with {member} ({member.mention}) by {moderator} ({moderator.mention}). There are {threadCount} previous threads involving this user'
+        postName += 'Mod Opened'
+        description = f'A modmail thread has been opened with {member} ({member.mention}) by {moderator} ({moderator.mention}). There are {threadCount} previous threads involving this user.'
+
+    elif open_type == 'message_report':
+        postName += 'Message Reported'
+        description = f"A new message report needs to be reviewed from {member} ({member.mention}). There are {threadCount} previous threads involving this user."
 
     else:
-        description = f"A new modmail needs to be reviewed from {member} ({member.mention}). There are {threadCount} previous threads involving this user"
+        postName += 'Modmail'
+        description = f"A new modmail needs to be reviewed from {member} ({member.mention}). There are {threadCount} previous threads involving this user."
 
-    description += f'. Archive link: {config.logUrl}{docID}'
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
         for pun in puns:
@@ -373,13 +368,33 @@ async def _trigger_create_user_thread(
                 )
 
     embed.description = description
-    mailMsg = await channel.send(embed=embed)
-    await _info(await bot.get_context(mailMsg), bot, member.id if banAppeal else await guild.fetch_member(member.id))
+    tag = forum.get_tag(tagIDS[open_type])
+    thread, threadMessage = await forum.create_thread(
+        name=postName,
+        auto_archive_duration=10080,
+        embed=embed,
+        applied_tags=[tag],
+        reason='New modmail opened'
+    )
+    await _create_thread(
+        bot,
+        thread,
+        member if not moderator else moderator,
+        member,
+        is_mention,
+        content=content,
+        is_mod=True if moderator else False,
+        ban_appeal=open_type == 'ban_appeal',
+        message=message,
+        report=interaction,
+    )
+    await _info(await bot.get_context(threadMessage), bot, member.id if open_type == 'ban_appeal' else await guild.fetch_member(member.id))
 
-    if banAppeal:
+    if open_type == 'ban_appeal':
         await member.send(
             f'Hi there!\nYou have submitted a ban appeal to the chat moderators who oversee the **{guild.name}** Discord.\n\nI will send you a message when a moderator responds to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅.\n\nPlease be patient for a response; the moderation team will have active discussions about the appeal and may take some time to reply. We ask that you be civil and respectful during this process so constructive conversation can be had in both directions. At the end of this process, moderators will either lift or uphold your ban -- you will receive an official message stating the final decision.'
         )
+        successfulDM = True
 
     else:
         try:
@@ -391,7 +406,7 @@ async def _trigger_create_user_thread(
         except discord.Forbidden:
             pass
 
-    return channel, successfulDM
+    return thread, successfulDM
 
 
 async def _trigger_create_mod_thread(bot, guild, member, moderator):
@@ -406,9 +421,9 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
     except discord.NotFound:
         raise RuntimeError('Invalid user')  # TODO: We need custom exceptions
 
-    category = guild.get_channel(config.category)
-    channelName = member.name if member.discriminator == '0' else f'{member.name}-{member.discriminator}'
-    channel = await category.create_text_channel(channelName, reason='New modmail opened')
+    forum = guild.get_channel(config.forumChannel)
+    postName = member.name + ' - Mod Opened'
+    tag = forum.get_tag(tagIDS['moderator'])
 
     embed = discord.Embed(title='New modmail opened', color=0xE3CF59)
 
@@ -418,16 +433,12 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
     )
 
     threadCount = db.count_documents({'recipient.id': str(member.id)})
-    docID = await _create_thread(
-        bot, channel, moderator, member, created_at=datetime.now(tz=timezone.utc).isoformat(sep=' ')
-    )  # Since we don't have a reference with slash commands, pull current iso datetime in UTC
 
     punsDB = mclient.bowser.puns
     puns = punsDB.find({'user': member.id, 'active': True})
     punsCnt = punsDB.count_documents({'user': member.id, 'active': True})
 
-    description = f'A modmail thread has been opened with {member} ({member.mention}) by {moderator} ({moderator.mention}). There are {threadCount} previous threads involving this user'
-    description += f'. Archive link: {config.logUrl}{docID}'
+    description = f'A modmail thread has been opened with {member} ({member.mention}) by {moderator} ({moderator.mention}). There are {threadCount} previous threads involving this user.'
 
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
@@ -442,8 +453,18 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
                 )
 
     embed.description = description
-    mailMsg = await channel.send(moderator.mention, embed=embed)
-    await _info(await bot.get_context(mailMsg), bot, await guild.fetch_member(member.id))
+    thread, threadMessage = await forum.create_thread(
+        name=postName,
+        auto_archive_duration=10080,
+        content=moderator.mention,
+        embed=embed,
+        applied_tags=[tag],
+        reason='New modmail opened'
+    )
+    docID = await _create_thread(
+        bot, thread, moderator, member, created_at=datetime.now(tz=timezone.utc).isoformat(sep=' ')
+    )  # Since we don't have a reference with slash commands, pull current iso datetime in UTC
+    await _info(await bot.get_context(threadMessage), bot, await guild.fetch_member(member.id))
     try:
         await member.send(
             f'Hi there!\nThe chat moderators who oversee the **{guild.name}** Discord have opened a modmail with you!\n\nI will send you a message when a moderator responds to this thread. Every message you send to me while your thread is open will also be sent to the moderation team -- so you can message me anytime to add information or to reply to a moderator\'s message. You\'ll know your message has been sent when I react to your message with a ✅.'
@@ -452,7 +473,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
     except discord.Forbidden:
         # Cleanup if there really was an issue messaging the user, i.e. bot blocked
         db.delete_one({'_id': docID})
-        await channel.delete()
+        await thread.delete()
         raise
 
     embed = discord.Embed(
@@ -460,7 +481,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
         description='This thread is now open to moderator and user replies. Start the conversation by using `/reply` or `/areply`',
         color=0x58B9FF,
     )
-    await channel.send(embed=embed)
+    await thread.send(content=f'<@&{config.modRole}>', embed=embed, silent=True)
 
 
 async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
