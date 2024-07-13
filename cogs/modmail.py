@@ -46,7 +46,9 @@ class Mail(commands.Cog):
     @app_commands.default_permissions(view_audit_log=True)
     async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str], auto: bool = False):
         if not delay:
-            await interaction.response.send_message(f'This thread has been closed by {interaction.user}. Use `/open` to send any followup messages to this user.')
+            await interaction.response.send_message(
+                f'This thread has been closed by {interaction.user}. Use `/open` to send any followup messages to this user.'
+            )
 
         else:
             await interaction.response.defer()
@@ -61,10 +63,15 @@ class Mail(commands.Cog):
             await interaction.followup.send('This is not a modmail channel!', ephemeral=True)
 
         except exceptions.InvalidType:
-            await interaction.followup.send(':x: Ban appeals cannot be closed with the `/close` command. Use `/appeal accept` or `/appeal deny` instead', ephemeral=True)
+            await interaction.followup.send(
+                ':x: Ban appeals cannot be closed with the `/close` command. Use `/appeal accept` or `/appeal deny` instead',
+                ephemeral=True,
+            )
 
         if delay:
-            await interaction.followup.send(f'Thread has been scheduled to be closed {scheduledTime} by {interaction.user}. Once closed, use `/open` to send any followup messages to this user.')
+            await interaction.followup.send(
+                f'Thread has been scheduled to be closed {scheduledTime} by {interaction.user}. Once closed, use `/open` to send any followup messages to this user.'
+            )
 
     async def _close_generic(self, user, guild, channel, delay):
         db = mclient.modmail.logs
@@ -95,7 +102,7 @@ class Mail(commands.Cog):
             )
             self.closeQueue[doc['_id']] = close_action
             return f'<t:{int(delayDate.timestamp())}:R>'
-        
+
         else:
             await utils._close_thread(self.bot, user, guild, channel, self.bot.get_channel(config.modLog))
 
@@ -658,7 +665,9 @@ class Mail(commands.Cog):
 
         return content, embed
 
-    async def _user_create_thread(self, message: discord.Message, interaction: discord.Interaction = None, menu_interacted: bool = False):
+    async def _user_create_thread(
+        self, message: discord.Message, interaction: discord.Interaction = None, menu_interacted: bool = False
+    ):
         successfulDM = False
         attachments = [x.url for x in message.attachments]
         ctx = await self.bot.get_context(message)
@@ -682,9 +691,7 @@ class Mail(commands.Cog):
                     )
 
                 content, embed = self._format_message_embed(message, attachments, interaction=interaction)
-                await self.bot.get_channel(int(thread['channel_id'])).send(
-                    embed=embed
-                )
+                await self.bot.get_channel(int(thread['channel_id'])).send(embed=embed)
                 db.update_one(
                     {'_id': thread['_id']},
                     {

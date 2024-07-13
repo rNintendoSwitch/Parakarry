@@ -31,7 +31,7 @@ tagIDS = {
     'user': config.userThreadTag,
     'moderator': config.modThreadTag,
     'ban_appeal': config.banAppealTag,
-    'message_report': config.messageReportTag
+    'message_report': config.messageReportTag,
 }
 
 
@@ -286,7 +286,15 @@ async def _close_thread(
 
 
 async def _trigger_create_user_thread(
-    bot, member, message, open_type, is_mention=False, moderator=None, content=None, anonymous=True, interaction=None,
+    bot,
+    member,
+    message,
+    open_type,
+    is_mention=False,
+    moderator=None,
+    content=None,
+    anonymous=True,
+    interaction=None,
 ):
     db = mclient.modmail.logs
     punsDB = mclient.bowser.puns
@@ -370,11 +378,7 @@ async def _trigger_create_user_thread(
     embed.description = description
     tag = forum.get_tag(tagIDS[open_type])
     thread, threadMessage = await forum.create_thread(
-        name=postName,
-        auto_archive_duration=10080,
-        embed=embed,
-        applied_tags=[tag],
-        reason='New modmail opened'
+        name=postName, auto_archive_duration=10080, embed=embed, applied_tags=[tag], reason='New modmail opened'
     )
     await _create_thread(
         bot,
@@ -388,7 +392,11 @@ async def _trigger_create_user_thread(
         message=message,
         report=interaction,
     )
-    await _info(await bot.get_context(threadMessage), bot, member.id if open_type == 'ban_appeal' else await guild.fetch_member(member.id))
+    await _info(
+        await bot.get_context(threadMessage),
+        bot,
+        member.id if open_type == 'ban_appeal' else await guild.fetch_member(member.id),
+    )
 
     if open_type == 'ban_appeal':
         await member.send(
@@ -459,7 +467,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
         content=moderator.mention,
         embed=embed,
         applied_tags=[tag],
-        reason='New modmail opened'
+        reason='New modmail opened',
     )
     docID = await _create_thread(
         bot, thread, moderator, member, created_at=datetime.now(tz=timezone.utc).isoformat(sep=' ')
