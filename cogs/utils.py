@@ -642,3 +642,33 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
     embed.add_field(name='Punishments', value=punishments, inline=False)
     return await ctx.send(embed=embed)
+
+class RiskyConfirmation(discord.ui.View):
+    message: discord.Message | None = None
+
+    def __init__(self, timeout=120.0):
+        super().__init__(timeout=timeout)
+        self.value = None
+
+    @discord.ui.button(label='Yes', style=discord.ButtonStyle.danger)
+    async def yes(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        self.disable_buttons()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    @discord.ui.button(label='No', style=discord.ButtonStyle.primary)
+    async def no(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        self.disable_buttons()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    def disable_buttons(self):
+        for c in self.children:
+            c.disabled = True
+
+    async def on_timeout(self):
+        self.disable_buttons()
+        if self.message:
+            await self.message.edit(view=self)

@@ -5,7 +5,7 @@ import time
 import typing
 import uuid
 from code import interact
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sys import exit
 
 import discord
@@ -402,7 +402,6 @@ class Mail(commands.Cog):
     ):
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
-        userDB = mclient.bowser.users
 
         doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
         if not doc:
@@ -415,9 +414,9 @@ class Mail(commands.Cog):
             delayDate = utils.resolve_duration(next_attempt)
             if delayDate != None:
                 # We need a timestamp if this will expire
-                delayDate = int(delayDate.timestamp())
-                humanizedTimestamp = f'until <t:{delayDate}:f>'
-                durationUserStr = f'You may appeal again after __<t:{delayDate}:f> (approximately <t:{delayDate}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
+                delayTimestamp = int(delayDate.timestamp())
+                humanizedTimestamp = f'until <t:{delayTimestamp}:f>'
+                durationUserStr = f'You may appeal again after __<t:{delayTimestamp}:f> (approximately <t:{delayTimestamp}:R>)__. In the meantime you have been kicked from the Ban Appeals server. When you are able to appeal again you may rejoin with this invite: {config.appealInvite}\n\nReason given by moderators:\n```{reason}```'
 
             else:
                 if (
@@ -435,6 +434,28 @@ class Mail(commands.Cog):
         except KeyError:
             return await interaction.response.send_message('Invalid duration')
 
+        # If a moderator provides a duration less than one hour or with minutes, confirm
+        followup_with_edit = False
+        if 'm' in next_attempt.lower() and delayDate <= datetime.now(tz=timezone.utc) + timedelta(hours=2):
+            view = utils.RiskyConfirmation()
+            view.message = await interaction.followup.send(
+                f':question: The duration you have provided is **less than 2 hours** and will allow the user to reappeal <t:{delayTimestamp}:R>. Are you sure that you\'d like to proceed?',
+                view=view,
+                wait=True
+            )
+            timedOut = await view.wait()
+
+            if timedOut:
+                await view.message.edit(content='Denial confirmation timed out, no action has been taken. Rerun `/appeal deny` to try again.')
+                return
+
+            if not view.value:
+                await view.message.edit(content='Appeal denial canceled. No action has been taken.')
+                return
+            
+            else:
+                followup_with_edit = True
+
         docID = str(uuid.uuid4())
         while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
@@ -448,7 +469,7 @@ class Mail(commands.Cog):
                 'type': 'appealdeny',
                 'timestamp': int(time.time()),
                 'reason': reason,
-                'expiry': delayDate,
+                'expiry': delayTimestamp,
                 'context': 'banappeal',
                 'active': True,
             }
@@ -459,7 +480,7 @@ class Mail(commands.Cog):
         embed.set_footer(text=docID)
         embed.add_field(name='User', value=user.mention, inline=True)
         embed.add_field(name='Moderator', value=f'{interaction.user.mention}', inline=True)
-        embed.add_field(name='Next appeal in', value='Never' if delayDate == None else f'<t:{delayDate}:R>')
+        embed.add_field(name='Next appeal in', value='Never' if delayDate == None else f'<t:{delayTimestamp}:R>')
         embed.add_field(name='Reason', value=reason)
         await self.bot.get_channel(config.modLog).send(embed=embed)
 
@@ -469,16 +490,18 @@ class Mail(commands.Cog):
             )
 
         except:
-            await interaction.followup.send(
-                f':warning: This ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}, but I was unable to DM them the decision.'
-            )
+            response_text = f':warning: This ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}, but I was unable to DM them the decision.'
 
         else:
-            await interaction.followup.send(
-                f':white_check_mark: This ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}.'
-            )
+            response_text = f':white_check_mark: This ban appeal for {user} has been denied by {interaction.user} {humanizedTimestamp}.'
 
         finally:
+            if followup_with_edit:
+                await view.message.edit(content=response_text, view=None)
+
+            else:
+                await interaction.followup.send(response_text)
+
             await utils._close_thread(
                 self.bot,
                 interaction.user,
