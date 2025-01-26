@@ -322,7 +322,8 @@ async def _trigger_create_user_thread(
 
     # Deny thread creation if modmail restricted
     if open_type == 'user':
-        if not await mclient.bowser.users.find_one({'_id': member.id})['modmail']:
+        userDoc = await mclient.bowser.users.find_one({'_id': member.id})
+        if not userDoc['modmail']:
             raise exceptions.ModmailBlacklisted
 
     forum = guild.get_channel(config.forumChannel)
