@@ -1,15 +1,16 @@
+import asyncio
 import time
 import typing
 from datetime import datetime, timedelta, timezone
 
 import config
 import discord
-import pymongo
+import motor.motor_asyncio
 
 import exceptions
 
-
-mclient = pymongo.MongoClient(config.mongoURI)
+globalLoop = asyncio.get_event_loop()
+mclient = motor.motor_asyncio.AsyncIOMotorClient(config.mongoURI, io_loop=globalLoop)
 punNames = {
     'strike': '{} Strike{}',
     'destrike': 'Removed {} Strike{}',
@@ -122,7 +123,7 @@ def humanize_duration(duration):
 
 async def _can_appeal(member):
     db = mclient.bowser.puns
-    pun = db.find_one({'user': member.id, 'type': 'appealdeny', 'active': True})
+    pun = await db.find_one({'user': member.id, 'type': 'appealdeny', 'active': True})
     if pun:
         try:
             if pun['expiry'] == None:
@@ -187,7 +188,7 @@ async def _create_thread(
     else:
         _id = str(channel.id) + '-' + str(int(time.time()))
 
-    db.insert_one(
+    await db.insert_one(
         {
             '_id': _id,
             'key': _id,
@@ -230,7 +231,7 @@ async def _close_thread(
     reason: str = None,
 ):
     db = mclient.modmail.logs
-    doc = db.find_one({'channel_id': str(thread_channel.id)})
+    doc = await db.find_one({'channel_id': str(thread_channel.id)})
 
     closeInfo = {
         '$set': {
@@ -248,7 +249,7 @@ async def _close_thread(
 
     if reason:
         closeInfo['$set']['close_message'] = reason
-    db.update_one({'_id': doc['_id']}, closeInfo)
+    await db.update_one({'_id': doc['_id']}, closeInfo)
 
     try:
         channel = bot.get_channel(thread_channel.id)
@@ -321,7 +322,7 @@ async def _trigger_create_user_thread(
 
     # Deny thread creation if modmail restricted
     if open_type == 'user':
-        if not mclient.bowser.users.find_one({'_id': member.id})['modmail']:
+        if not await mclient.bowser.users.find_one({'_id': member.id})['modmail']:
             raise exceptions.ModmailBlacklisted
 
     forum = guild.get_channel(config.forumChannel)
@@ -338,11 +339,10 @@ async def _trigger_create_user_thread(
         icon_url=member.display_avatar.with_static_format('png').with_size(1024),
     )
 
-    threadCount = db.count_documents({'recipient.id': str(member.id)})
+    threadCount = await db.count_documents({'recipient.id': str(member.id)})
 
-    punsDB = mclient.bowser.puns
     puns = punsDB.find({'user': member.id, 'active': True})
-    punsCnt = punsDB.count_documents({'user': member.id, 'active': True})
+    punsCnt = await punsDB.count_documents({'user': member.id, 'active': True})
     if open_type == 'ban_appeal':
         description = f'A new ban appeal has been submitted by {member} ({member.mention}) and needs to be reviewed.'
 
@@ -360,7 +360,7 @@ async def _trigger_create_user_thread(
 
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
-        for pun in puns:
+        async for pun in puns:
             timestamp = f'<t:{int(pun["timestamp"])}:f>'
             if pun['type'] == 'strike':
                 description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
@@ -435,17 +435,16 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
         icon_url=member.display_avatar.with_static_format('png').with_size(1024),
     )
 
-    threadCount = db.count_documents({'recipient.id': str(member.id)})
+    threadCount = await db.count_documents({'recipient.id': str(member.id)})
 
-    punsDB = mclient.bowser.puns
     puns = punsDB.find({'user': member.id, 'active': True})
-    punsCnt = punsDB.count_documents({'user': member.id, 'active': True})
+    punsCnt = await punsDB.count_documents({'user': member.id, 'active': True})
 
     description = f'A modmail thread has been opened with {member} ({member.mention}) by {moderator} ({moderator.mention}). There are {threadCount} previous threads involving this user.'
 
     if punsCnt:
         description += '\n\n__User has active punishments:__\n'
-        for pun in puns:
+        async for pun in puns:
             timestamp = f'<t:{int(pun["timestamp"])}:f>'
             if pun['type'] == 'strike':
                 description += f"**{punNames[pun['type']].format(pun['active_strike_count'], 's' if pun['active_strike_count'] > 1 else '')}** by <@{pun['moderator']}> on {timestamp}\n    ･ {pun['reason']}\n"
@@ -475,7 +474,7 @@ async def _trigger_create_mod_thread(bot, guild, member, moderator):
 
     except discord.Forbidden:
         # Cleanup if there really was an issue messaging the user, i.e. bot blocked
-        db.delete_one({'_id': docID})
+        await db.delete_one({'_id': docID})
         await thread.delete()
         raise
 
@@ -491,7 +490,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     inServer = True
     if type(user) == int:
         # User doesn't share the ctx server, fetch it instead
-        dbUser = mclient.bowser.users.find_one({'_id': user})
+        dbUser = await mclient.bowser.users.find_one({'_id': user})
         inServer = False
 
         user = await bot.fetch_user(user)
@@ -510,11 +509,12 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
             return await ctx.send(embed=embed)  # TODO: Return DB info if it exists as well
 
     else:
-        dbUser = mclient.bowser.users.find_one({'_id': user.id})
+        dbUser = await mclient.bowser.users.find_one({'_id': user.id})
 
     # Member object, loads of info to work with
-    messages = mclient.bowser.messages.find({'author': user.id})
-    msgCount = 0 if not messages else mclient.bowser.messages.count_documents({'author': user.id})
+    messageCursor = mclient.bowser.messages.find({'author': user.id}).sort('timestamp', -1)
+    lastMessage = await messageCursor.to_list(length=1)
+    msgCount = await mclient.bowser.messages.count_documents({'author': user.id})
 
     desc = (
         f'Fetched user {user.mention}.'
@@ -563,16 +563,16 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
     embed.add_field(name='Roles', value=roles, inline=False)
 
-    lastMsg = 'N/a' if msgCount == 0 else f'<t:{int(messages.sort("timestamp", pymongo.DESCENDING)[0]["timestamp"])}:f>'
+    lastMsg = 'N/a' if msgCount == 0 else f'<t:{int(lastMessage[0]["timestamp"])}:f>'
     embed.add_field(name='Last message', value=lastMsg, inline=True)
     embed.add_field(name='Created', value=f'<t:{int(user.created_at.timestamp())}:f>', inline=True)
 
-    noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'})
-    noteCnt = mclient.bowser.puns.count_documents({'user': user.id, 'type': 'note'})
+    noteCnt = await mclient.bowser.puns.count_documents({'user': user.id, 'type': 'note'})
     fieldValue = 'View history to get full details on all notes.\n\n'
     if noteCnt:
+        noteDocs = mclient.bowser.puns.find({'user': user.id, 'type': 'note'}).sort('timestamp', -1)
         noteList = []
-        for x in noteDocs.sort('timestamp', pymongo.DESCENDING):
+        async for x in noteDocs:
             stamp = f'[<t:{int(x["timestamp"])}:d>]'
             noteContent = f'{stamp}: {x["reason"]}'
 
@@ -588,17 +588,17 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
         embed.add_field(name='User notes', value=fieldValue + '\n'.join(noteList), inline=False)
 
     punishments = ''
-    punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}})
-    punsCnt = mclient.bowser.puns.count_documents({'user': user.id, 'type': {'$ne': 'note'}})
+    punsCnt = await mclient.bowser.puns.count_documents({'user': user.id, 'type': {'$ne': 'note'}})
     if not punsCnt:
         punishments = '__*No punishments on record*__'
 
     else:
+        punsCol = mclient.bowser.puns.find({'user': user.id, 'type': {'$ne': 'note'}}).sort('timestamp', -1)
         puns = 0
         activeStrikes = 0
         totalStrikes = 0
         activeMute = None
-        for pun in punsCol.sort('timestamp', pymongo.DESCENDING):
+        async for pun in punsCol:
             if pun['type'] == 'strike':
                 totalStrikes += pun['strike_count']
                 activeStrikes += pun['active_strike_count']
@@ -611,6 +611,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
                     activeMute = pun['expiry']
 
             if puns >= 5:
+                # Continue used so we can increment all statistics but capping the actual list to the 5 most recent
                 continue
 
             puns += 1

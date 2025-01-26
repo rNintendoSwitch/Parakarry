@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 from sys import exit
 
 import discord
-import pymongo
+import motor.motor_asyncio
 from discord import app_commands
 from discord.ext import commands
 
@@ -24,7 +24,8 @@ except ImportError:
     logging.critical('[Bot] config.py does not exist, you should make one from the example config')
     exit(1)
 
-mclient = pymongo.MongoClient(config.mongoURI)
+globalLoop = asyncio.get_event_loop()
+mclient = motor.motor_asyncio.AsyncIOMotorClient(config.mongoURI, io_loop=globalLoop)
 guildList = [config.guild]
 
 
@@ -75,7 +76,7 @@ class Mail(commands.Cog):
 
     async def _close_generic(self, user, guild, channel, delay):
         db = mclient.modmail.logs
-        doc = db.find_one({'channel_id': str(channel.id), 'open': True})
+        doc = await db.find_one({'channel_id': str(channel.id), 'open': True})
 
         if not doc:
             raise exceptions.NotAModmail
@@ -134,7 +135,7 @@ class Mail(commands.Cog):
 
     async def _reply(self, interaction: discord.Interaction, content, attachment, anonymous=False):
         db = mclient.modmail.logs
-        doc = db.find_one({'channel_id': str(interaction.channel.id)})
+        doc = await db.find_one({'channel_id': str(interaction.channel.id)})
 
         if (
             interaction.channel.category_id != config.category or not doc
@@ -213,7 +214,7 @@ class Mail(commands.Cog):
         await interaction.response.send_message(embed=embed)
         mailMsg = await interaction.original_response()
 
-        db.update_one(
+        await db.update_one(
             {'_id': doc['_id']},
             {
                 '$push': {
@@ -265,7 +266,7 @@ class Mail(commands.Cog):
         if member.bot:
             return await interaction.followup.send(':x: Modmail threads cannot be opened with bot accounts')
 
-        if mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
+        if await mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True}):
             return await interaction.followup.send(
                 ':x: Unable to open modmail to user -- there is already a thread involving them currently open'
             )
@@ -324,21 +325,21 @@ class Mail(commands.Cog):
         punsDB = mclient.bowser.puns
         userDB = mclient.bowser.users
 
-        doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
+        doc = await db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
         if not doc:
             return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
 
         await interaction.response.defer()
 
         user = await self.bot.fetch_user(int(doc['recipient']['id']))
-        punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
-        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
+        await punsDB.update_one({'user': user.id, 'type': 'ban', 'active': True}, {'$set': {'active': False}})
+        await punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
         await interaction.guild.unban(user, reason=f'Ban appeal accepted by {interaction.user}')
         docID = str(uuid.uuid4())
-        while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
+        while await punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
 
-        punsDB.insert_one(
+        await punsDB.insert_one(
             {
                 '_id': docID,
                 'user': user.id,
@@ -403,7 +404,7 @@ class Mail(commands.Cog):
         db = mclient.modmail.logs
         punsDB = mclient.bowser.puns
 
-        doc = db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
+        doc = await db.find_one({'channel_id': str(interaction.channel.id), 'open': True, 'ban_appeal': True})
         if not doc:
             return await interaction.response.send_message(':x: This is not a ban appeal channel!', ephemeral=True)
 
@@ -421,7 +422,7 @@ class Mail(commands.Cog):
             else:
                 if (
                     self.leadModRole not in interaction.user.roles
-                    and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2
+                    and await punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2
                 ):
                     # User has not met the minimum appeal denials to be permanently denied
                     return await interaction.response.send_message(
@@ -457,11 +458,11 @@ class Mail(commands.Cog):
                 followup_with_edit = True
 
         docID = str(uuid.uuid4())
-        while punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
+        while await punsDB.find_one({'_id': docID}):  # Uh oh, duplicate uuid generated
             docID = str(uuid.uuid4())
 
-        punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
-        punsDB.insert_one(
+        await punsDB.update_one({'user': user.id, 'type': 'appealdeny', 'active': True}, {'$set': {'active': False}})
+        await punsDB.insert_one(
             {
                 '_id': docID,
                 'user': user.id,
@@ -544,14 +545,14 @@ class Mail(commands.Cog):
     async def on_typing(self, channel, user, when):
         if channel.type == discord.ChannelType.private:
             db = mclient.modmail.logs
-            doc = db.find_one({'open': True, 'creator.id': str(user.id)})
+            doc = await db.find_one({'open': True, 'creator.id': str(user.id)})
             if doc:
                 await self.bot.get_channel(int(doc['channel_id'])).typing()
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, member):
         db = mclient.modmail.logs
-        thread = db.find_one({'recipient.id': str(member.id), 'open': True})
+        thread = await db.find_one({'recipient.id': str(member.id), 'open': True})
         if thread:
             channel = self.bot.get_channel(int(thread['channel_id']))
             await channel.send(f'**{member}** has been banned from the server and this thread is now closed.')
@@ -562,7 +563,7 @@ class Mail(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member):
         db = mclient.modmail.logs
-        thread = db.find_one({'recipient.id': str(member.id), 'open': True})
+        thread = await db.find_one({'recipient.id': str(member.id), 'open': True})
         if thread:  # Check if a thread is open
             if (
                 member.guild.id == config.guild and thread['_id'] in self.closeQueue.keys()
@@ -611,7 +612,7 @@ class Mail(commands.Cog):
     async def on_member_remove(self, member):
         await asyncio.sleep(10)  # Wait for ban to pass and thread to close in-case
         db = mclient.modmail.logs
-        thread = db.find_one({'recipient.id': str(member.id), 'open': True})
+        thread = await db.find_one({'recipient.id': str(member.id), 'open': True})
         if thread:
             channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
 
@@ -703,7 +704,7 @@ class Mail(commands.Cog):
             # User has sent a message -- check
             db = mclient.modmail.logs
             reporter = message.author if not interaction else interaction.user
-            thread = db.find_one({'recipient.id': str(reporter.id), 'open': True})
+            thread = await db.find_one({'recipient.id': str(reporter.id), 'open': True})
             if thread:
                 successfulDM = True
                 if thread['_id'] in self.closeQueue.keys():  # Thread close was scheduled, cancel due to response
@@ -715,7 +716,7 @@ class Mail(commands.Cog):
 
                 content, embed = self._format_message_embed(message, attachments, interaction=interaction)
                 await self.bot.get_channel(int(thread['channel_id'])).send(embed=embed)
-                db.update_one(
+                await db.update_one(
                     {'_id': thread['_id']},
                     {
                         '$push': {
@@ -771,10 +772,10 @@ class Mail(commands.Cog):
 
         elif message.channel.category_id == config.category:
             db = mclient.modmail.logs
-            doc = db.find_one({'channel_id': str(message.channel.id)})
+            doc = await db.find_one({'channel_id': str(message.channel.id)})
             if doc:
                 if not ctx.valid:  # Not an invoked command, mark as internal message
-                    db.update_one(
+                    await db.update_one(
                         {'_id': doc['_id']},
                         {
                             '$push': {

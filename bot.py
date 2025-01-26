@@ -3,7 +3,6 @@ import logging
 from sys import exit
 
 import discord
-import pymongo
 from discord.ext import commands
 
 
@@ -16,8 +15,6 @@ try:
 except ImportError:
     logging.critical('[Bot] config.py does not exist, you should make one from the example config')
     exit(1)
-
-mclient = pymongo.MongoClient(config.mongoURI)
 
 
 class Parakarry(commands.Bot):
