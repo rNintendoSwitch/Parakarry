@@ -613,7 +613,7 @@ class Mail(commands.Cog):
         db = mclient.modmail.logs
         thread = db.find_one({'recipient.id': str(member.id), 'open': True})
         if thread:
-            channel = self.bot.get_guild(int(thread['guild_id'])).get_channel(int(thread['channel_id']))
+            channel = await self.bot.fetch_channel(thread['channel_id'])
 
             if member.guild.id == config.guild:
                 scheduledTime = await self._close_generic(member, member.guild, channel, '4h')
