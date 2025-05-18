@@ -681,7 +681,7 @@ class Mail(commands.Cog):
                 else:
                     reply_content = reply.content
 
-                embed.add_field(name=f'\⤵  In reply to {reply.author}', value=f'{reply.jump_url}\n{reply_content}', inline=False)
+                embed.add_field(name=f'⤵  In reply to {reply.author}', value=f'{reply.jump_url}\n{reply_content}', inline=False)
                 if reply.reference and reply.reference.cached_message is not None:
                     reply = reply.reference.cached_message
 
