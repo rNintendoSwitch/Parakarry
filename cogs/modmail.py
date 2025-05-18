@@ -660,6 +660,7 @@ class Mail(commands.Cog):
 
         embed = discord.Embed(
             title='Message reported' if interaction else 'New message',
+            url=message.jump_url,
             description=content,
             color=0xF381FD if interaction else 0x32B6CE,
         )
@@ -668,8 +669,24 @@ class Mail(commands.Cog):
         if not interaction:
             embed.set_footer(text=f'{message.channel.id}/{message.id}')
 
-        else:
-            embed.add_field(name='Message link', value=message.jump_url)
+        elif interaction and message.reference and message.reference.cached_message:
+            reply = message.reference.cached_message
+            for index in range(4):  # Resolve 4 message replies
+                if len(reply.content) > 200:
+                    reply_content = reply.content[:200] + ' [...]'
+
+                elif not reply.content:
+                    reply_content = '*sent a sticker*'
+
+                else:
+                    reply_content = reply.content
+
+                embed.add_field(name=f'\⤵  In reply to {reply.author}', value=f'{reply.jump_url}\n{reply_content}', inline=False)
+                if reply.reference and reply.reference.cached_message is not None:
+                    reply = reply.reference.cached_message
+
+                else:  # The message isn't cached or doesn't have any more replies in the chain
+                    break
 
         if message.stickers:
             embed.set_image(url=message.stickers[0].url)
