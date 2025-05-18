@@ -2,3 +2,4 @@ discord.py[srv]
 pymongo
 jishaku
 pylint
+setuptools
