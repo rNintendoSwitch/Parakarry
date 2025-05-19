@@ -660,7 +660,6 @@ class Mail(commands.Cog):
 
         embed = discord.Embed(
             title='Message reported' if interaction else 'New message',
-            url=message.jump_url,
             description=content,
             color=0xF381FD if interaction else 0x32B6CE,
         )
@@ -671,6 +670,7 @@ class Mail(commands.Cog):
 
         elif interaction and message.reference and message.reference.cached_message:
             reply = message.reference.cached_message
+            embed.url = message.jump_url
             for index in range(4):  # Resolve 4 message replies
                 if len(reply.content) > 200:
                     reply_content = reply.content[:200] + ' [...]'
@@ -687,6 +687,9 @@ class Mail(commands.Cog):
 
                 else:  # The message isn't cached or doesn't have any more replies in the chain
                     break
+
+        else:
+            embed.url = message.jump_url
 
         if message.stickers:
             embed.set_image(url=message.stickers[0].url)
