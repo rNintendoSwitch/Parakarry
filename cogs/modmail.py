@@ -436,7 +436,7 @@ class Mail(commands.Cog):
 
         # If a moderator provides a duration less than one hour or with minutes, confirm
         followup_with_edit = False
-        if 'm' in next_attempt.lower() and delayDate <= datetime.now(tz=timezone.utc) + timedelta(hours=2):
+        if 'm' in next_attempt.lower() and delayDate and delayDate <= datetime.now(tz=timezone.utc) + timedelta(hours=2):
             view = utils.RiskyConfirmation()
             view.message = await interaction.followup.send(
                 f':question: The duration you have provided is **less than 2 hours** and will allow the user to reappeal <t:{delayTimestamp}:R>. Are you sure that you\'d like to proceed?',
