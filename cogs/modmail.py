@@ -412,6 +412,7 @@ class Mail(commands.Cog):
         user = await self.bot.fetch_user(int(doc['recipient']['id']))
         try:
             delayDate = utils.resolve_duration(next_attempt)
+            delayTimestamp = None
             if delayDate != None:
                 # We need a timestamp if this will expire
                 delayTimestamp = int(delayDate.timestamp())
@@ -469,7 +470,7 @@ class Mail(commands.Cog):
                 'type': 'appealdeny',
                 'timestamp': int(time.time()),
                 'reason': reason,
-                'expiry': None if not delayTimestamp else delayTimestamp,
+                'expiry': delayTimestamp,
                 'context': 'banappeal',
                 'active': True,
             }
