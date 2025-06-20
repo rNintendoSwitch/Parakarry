@@ -469,7 +469,7 @@ class Mail(commands.Cog):
                 'type': 'appealdeny',
                 'timestamp': int(time.time()),
                 'reason': reason,
-                'expiry': delayTimestamp,
+                'expiry': None if not delayTimestamp else delayTimestamp,
                 'context': 'banappeal',
                 'active': True,
             }
