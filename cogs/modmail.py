@@ -422,7 +422,7 @@ class Mail(commands.Cog):
             else:
                 if (
                     self.leadModRole not in interaction.user.roles
-                    and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) <= 2
+                    and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2
                 ):
                     # User has not met the minimum appeal denials to be permanently denied
                     return await interaction.response.send_message(
