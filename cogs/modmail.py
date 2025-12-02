@@ -5,7 +5,7 @@ import time
 import typing
 import uuid
 from code import interact
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from sys import exit
 
 import discord
@@ -437,23 +437,29 @@ class Mail(commands.Cog):
 
         # If a moderator provides a duration less than one hour or with minutes, confirm
         followup_with_edit = False
-        if 'm' in next_attempt.lower() and delayDate and delayDate <= datetime.now(tz=timezone.utc) + timedelta(hours=2):
+        if (
+            'm' in next_attempt.lower()
+            and delayDate
+            and delayDate <= datetime.now(tz=timezone.utc) + timedelta(hours=2)
+        ):
             view = utils.RiskyConfirmation()
             view.message = await interaction.followup.send(
                 f':question: The duration you have provided is **less than 2 hours** and will allow the user to reappeal <t:{delayTimestamp}:R>. Are you sure that you\'d like to proceed?',
                 view=view,
-                wait=True
+                wait=True,
             )
             timedOut = await view.wait()
 
             if timedOut:
-                await view.message.edit(content='Denial confirmation timed out, no action has been taken. Rerun `/appeal deny` to try again.')
+                await view.message.edit(
+                    content='Denial confirmation timed out, no action has been taken. Rerun `/appeal deny` to try again.'
+                )
                 return
 
             if not view.value:
                 await view.message.edit(content='Appeal denial canceled. No action has been taken.')
                 return
-            
+
             else:
                 followup_with_edit = True
 
@@ -682,7 +688,9 @@ class Mail(commands.Cog):
                 else:
                     reply_content = reply.content
 
-                embed.add_field(name=f'⤵  In reply to {reply.author}', value=f'{reply.jump_url}\n{reply_content}', inline=False)
+                embed.add_field(
+                    name=f'⤵  In reply to {reply.author}', value=f'{reply.jump_url}\n{reply_content}', inline=False
+                )
                 if reply.reference and reply.reference.cached_message is not None:
                     reply = reply.reference.cached_message
 
