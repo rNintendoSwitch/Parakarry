@@ -422,11 +422,11 @@ class Mail(commands.Cog):
             else:
                 if (
                     self.leadModRole not in interaction.user.roles
-                    and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) < 2
+                    and punsDB.count_documents({'user': user.id, 'type': 'appealdeny'}) <= 2
                 ):
                     # User has not met the minimum appeal denials to be permanently denied
                     return await interaction.response.send_message(
-                        ':x: To permanently deny a ban appeal, the user must have been denied at least 2 times previously'
+                        ':x: To permanently deny a ban appeal, the user must have at least 2 previously denied appeals. A Moderation Team Lead can bypass this restriction'
                     )
 
                 humanizedTimestamp = 'permanently'
