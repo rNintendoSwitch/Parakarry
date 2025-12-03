@@ -559,7 +559,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
             roleList = tempList
 
-        # concat roles into comma delimitered string
+            # concat roles into comma delimitered string
             roles = str(roleList[0])
             for i, role in enumerate(roleList[1:]):
                 if len(f"{roles}, {role}") > 1000:  # too big?
