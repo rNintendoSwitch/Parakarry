@@ -559,14 +559,14 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
 
             roleList = tempList
 
-            # concat roles into comma delimitered string
-            roles = str(roleList[0])
-            for i, role in enumerate(roleList[1:]):
-                if len(f"{roles}, {role}") > 1000:  # too big?
-                    roles += f", and {len(roleList) - i} more..."
-                    break
+        # concat roles into comma delimitered string
+        roles = str(roleList[0])
+        for i, role in enumerate(roleList[1:]):
+            if len(f"{roles}, {role}") > 1000:  # too big?
+                roles += f", and {len(roleList) - i} more..."
+                break
 
-                roles += f", {role}"
+            roles += f", {role}"
 
     embed.add_field(name='Roles', value=roles, inline=False)
 
