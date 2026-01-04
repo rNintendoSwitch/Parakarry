@@ -17,8 +17,6 @@ except ImportError:
     logging.critical('[Bot] config.py does not exist, you should make one from the example config')
     exit(1)
 
-mclient = pymongo.MongoClient(config.mongoURI)
-
 
 class Parakarry(commands.Bot):
     def __init__(self):
