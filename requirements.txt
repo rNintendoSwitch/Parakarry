@@ -1,5 +1,5 @@
 discord.py[srv]
-pymongo
+pymongo==4.15.5
 jishaku
 pylint
 setuptools
