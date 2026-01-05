@@ -3,7 +3,6 @@ import logging
 from sys import exit
 
 import discord
-import pymongo
 from discord.ext import commands
 
 
@@ -36,11 +35,6 @@ class Parakarry(commands.Bot):
 
     async def on_ready(self):
         logging.info(f'Parakarry ModMail Bot - Now Logged in as {self.user} ({self.user.id})')
-        logging.info('Chunking guilds members...')
-        for g in self.guilds:
-            await g.chunk(cache=True)
-            logging.info(f'Chunked members for guild: {g.name} ({g.id})')
-
         await self.load_extension('cogs.modmail')
 
 
