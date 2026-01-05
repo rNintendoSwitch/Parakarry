@@ -652,6 +652,7 @@ async def _info(ctx, bot, user: typing.Union[discord.Member, int]):
     embed.add_field(name='Punishments', value=punishments, inline=False)
     return await ctx.send(embed=embed)
 
+
 class RiskyConfirmation(discord.ui.View):
     message: discord.Message | None = None
 
