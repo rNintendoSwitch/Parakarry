@@ -3,3 +3,4 @@ pymongo==4.15.5
 jishaku
 pylint
 setuptools
+brotli>=1.2
