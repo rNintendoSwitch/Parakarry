@@ -8,7 +8,6 @@ import pymongo
 
 import exceptions
 
-
 mclient = pymongo.AsyncMongoClient(config.mongoURI)
 punNames = {
     'strike': '{} Strike{}',

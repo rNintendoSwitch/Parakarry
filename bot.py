@@ -5,7 +5,6 @@ from sys import exit
 import discord
 from discord.ext import commands
 
-
 LOG_FORMAT = '[Parakarry] %(levelname)s [%(asctime)s]: %(message)s'
 logging.basicConfig(format=LOG_FORMAT, level=logging.INFO)
 
