@@ -431,7 +431,7 @@ class Mail(commands.Cog):
                     )
 
                 humanizedTimestamp = 'permanently'
-                durationUserStr = f'You are not eligible to submit any further appeals for your ban; this decision is final. Please note, it is a [violation of the Discord Community Guidelines](https://discord.com/guidelines/) to use another account to evade this ban and doing so may result in Discord taking action against your account(s), including account termination.'
+                durationUserStr = f'You are not eligible to submit any further appeals for your ban; this decision is final. Please note, it is a [violation of the Discord Community Guidelines](https://discord.com/guidelines/) to use another account to evade this ban and doing so may result in Discord taking action against your account(s), including account termination.\n\nReason given by moderators:\n```{reason}```'
 
         except KeyError:
             return await interaction.response.send_message('Invalid duration')
