@@ -23,7 +23,7 @@ class Parakarry(commands.Bot):
             case_insensitive=True,
             command_prefix=commands.when_mentioned,
             intents=discord.Intents(
-                guilds=True, members=True, bans=True, messages=True, message_content=True, typing=True
+                guilds=True, members=True, moderation=True, dm_messages=True, dm_typing=True
             ),
         )
         self.guildList = [config.guild]
