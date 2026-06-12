@@ -50,13 +50,13 @@ class Mail(commands.Cog):
             scheduledTime = await self._close_generic(interaction.user, interaction.guild, interaction.channel, delay)
 
         except exceptions.InvalidDuration:
-            await interaction.followup.send('Invalid duration passed', ephemeral=True)
+            return await interaction.followup.send('Invalid duration passed', ephemeral=True)
 
         except exceptions.NotAModmail:
-            await interaction.followup.send('This is not a modmail channel!', ephemeral=True)
+            return await interaction.followup.send('This is not a modmail channel!', ephemeral=True)
 
         except exceptions.InvalidType:
-            await interaction.followup.send(
+            return await interaction.followup.send(
                 ':x: Ban appeals cannot be closed with the `/close` command. Use `/appeal accept` or `/appeal deny` instead',
                 ephemeral=True,
             )
