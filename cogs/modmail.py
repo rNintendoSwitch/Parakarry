@@ -656,6 +656,15 @@ class Mail(commands.Cog):
     def _format_message_embed(
         self, message: discord.Message, attachments: list, interaction: discord.Interaction = None
     ):
+        is_forward = False
+        _original_jump_url = message.jump_url
+        if message.message_snapshots:
+            # Forwarded message
+            # Discord has future capability for recursive snapshot depths, but only one is returned for now
+            message = message.message_snapshots[0]
+            attachments = message.attachments
+            is_forward = True
+
         if message.content:
             content = message.content
 
@@ -670,12 +679,29 @@ class Mail(commands.Cog):
             description=content,
             color=0xF381FD if interaction else 0x32B6CE,
         )
-        embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.display_avatar.url)
+        if is_forward and message.cached_message:
+            embed.set_author(name=f'Forwarded message from {message.cached_message.author} ({message.cached_message.author.id})', icon_url=message.cached_message.author.display_avatar.url)
+            if interaction:
+                # Message reports shouldn't traverse through snapshots, jump only to the actual reported message
+                embed.url = _original_jump_url
+
+            else:
+                embed.url = message.cached_message.jump_url
+
+        elif is_forward and not message.cached_message:
+            embed.set_author(name=f'Forwarded message from unknown author')
+
+        else:
+            embed.set_author(name=f'{message.author} ({message.author.id})', icon_url=message.author.display_avatar.url)
 
         if not interaction:
-            embed.set_footer(text=f'{message.channel.id}/{message.id}')
+            if not is_forward:
+                embed.set_footer(text=f'{message.channel.id}/{message.id}')
+            
+            elif is_forward and message.cached_message:
+                embed.set_footer(text=f'{message.cached_message.channel.id}/{message.cached_message.id}')
 
-        elif interaction and message.reference and message.reference.cached_message:
+        elif not is_forward and interaction and message.reference and message.reference.cached_message:
             reply = message.reference.cached_message
             embed.url = message.jump_url
             for index in range(4):  # Resolve 4 message replies
@@ -697,7 +723,7 @@ class Mail(commands.Cog):
                 else:  # The message isn't cached or doesn't have any more replies in the chain
                     break
 
-        else:
+        elif not is_forward:
             embed.url = message.jump_url
 
         if message.stickers:
