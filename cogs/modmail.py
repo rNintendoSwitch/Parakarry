@@ -44,13 +44,7 @@ class Mail(commands.Cog):
     @app_commands.guilds(discord.Object(id=config.guild))
     @app_commands.default_permissions(view_audit_log=True)
     async def _close(self, interaction: discord.Interaction, delay: typing.Optional[str]):
-        if not delay:
-            await interaction.response.send_message(
-                f'This thread has been closed by {interaction.user}. Use `/open` to send any followup messages to this user.'
-            )
-
-        else:
-            await interaction.response.defer()
+        await interaction.response.defer()
 
         try:
             scheduledTime = await self._close_generic(interaction.user, interaction.guild, interaction.channel, delay)
@@ -70,6 +64,11 @@ class Mail(commands.Cog):
         if delay and scheduledTime:
             await interaction.followup.send(
                 f'Thread has been scheduled to be closed {scheduledTime} by {interaction.user}. Once closed, use `/open` to send any followup messages to this user.'
+            )
+
+        if not delay:
+            await interaction.followup.send(
+                f'This thread has been closed by {interaction.user}. Use `/open` to send any followup messages to this user.'
             )
 
     async def _close_generic(self, user, guild, channel, delay):
