@@ -142,6 +142,9 @@ class Mail(commands.Cog):
                 'Cannot send a reply here, this is not a modmail channel!', ephemeral=True
             )
 
+        if attachment:
+            await interaction.response.defer()
+
         if doc['_id'] in self.closeQueue.keys():  # Thread close was scheduled, cancel due to response
             self.closeQueue[doc['_id']].cancel()
             self.closeQueue.pop(doc['_id'], None)
@@ -209,7 +212,11 @@ class Mail(commands.Cog):
         elif attachment:  # Still have an attachment, but not an image
             embed.add_field(name=f'Attachment', value=replyMessage.attachments[0].url)
 
-        await interaction.response.send_message(embed=embed)
+        if not attachment:
+            await interaction.response.send_message(embed=embed)
+
+        else:
+            await interaction.followup.send(embed=embed)
         mailMsg = await interaction.original_response()
 
         await db.update_one(
