@@ -390,7 +390,7 @@ class Mail(commands.Cog):
                 await member.kick(reason='Accepted appeal')
 
             except:
-                return
+                pass
 
     @appeal_group.command(name='deny', description='Deny a user\'s ban appeal')
     @app_commands.describe(
@@ -527,7 +527,7 @@ class Mail(commands.Cog):
                     await member.ban(reason='Failed appeal, permanent denial')
 
             except:
-                return
+                pass
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):

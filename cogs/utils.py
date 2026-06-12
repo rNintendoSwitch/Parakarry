@@ -135,8 +135,11 @@ async def _can_appeal(member):
                     f'You have been automatically kicked from the /r/NintendoSwitch ban appeal server because you cannot make a new appeal yet. You can join back after __<t:{int(expiry.timestamp())}:f> (approximately <t:{int(expiry.timestamp())}:R>)__ to submit a new appeal with the following invite link: {config.appealInvite}\n\nReason given by moderators:\n```{pun["reason"]}```'
                 )
 
-        finally:
-            if pun['expiry'] > datetime.now(tz=timezone.utc).timestamp():
+        except:
+            # Failed to message user, just ignore
+            pass
+
+        if pun['expiry'] > datetime.now(tz=timezone.utc).timestamp():
                 await member.kick(reason='Not ready to appeal again')
                 return False
 
