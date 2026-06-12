@@ -729,13 +729,28 @@ class Mail(commands.Cog):
 
         db = mclient.modmail.logs
 
+        async def _create_discord_thread(self, message: discord.Message, interaction: discord.Interaction = None):
+            thread, successfulDM = await utils._trigger_create_user_thread(
+                self.bot,
+                message.author if not interaction else interaction.user,
+                message,
+                'message_report' if menu_interacted else 'user',
+                interaction=interaction,
+            )
+
+            content, embed = self._format_message_embed(message, attachments, interaction=interaction)
+            msgContent = f'<@&{config.modRole}>'
+            if not successfulDM:
+                msgContent += '\nPlease note, this user\'s DMs are closed. As such, they have been notified when they reported this message that they may not receive a moderator response.'
+
+            await thread.send(content=msgContent, embed=embed, silent=True)
+
         # Do something to check category, and add message to log
         if message.channel.type == discord.ChannelType.private or interaction:
             # User has sent a message -- check
             reporter = message.author if not interaction else interaction.user
             thread = await db.find_one({'recipient.id': str(reporter.id), 'open': True})
             if thread:
-                successfulDM = True
                 if thread['_id'] in self.closeQueue.keys():  # Thread close was scheduled, cancel due to response
                     self.closeQueue[thread['_id']].cancel()
                     self.closeQueue.pop(thread['_id'], None)
@@ -744,7 +759,32 @@ class Mail(commands.Cog):
                     )
 
                 content, embed = self._format_message_embed(message, attachments, interaction=interaction)
-                await self.bot.get_channel(int(thread['channel_id'])).send(embed=embed)
+                destination = self.bot.get_channel(int(thread['channel_id']))
+                if not destination:
+                    # Thread channel not found in cache, attempt to API pull and recover
+                    try:
+                        destination = await self.bot.fetch_channel(int(thread['channel_id']))
+
+                    except (discord.NotFound, discord.Forbidden):
+                        # Channel is bad. Force thread closure and create anew
+                        await db.update_one({'channel_id': thread['channel_id']}, {'$set': {'active': False}})
+                        await _create_discord_thread(self, message, interaction)
+                        if not interaction:
+                            await message.add_reaction('✅')
+
+                        if successfulDM and interaction:
+                            try:
+                                reportConfirm = await interaction.user.send(
+                                    f'*You reported a message from {message.author}: <{message.jump_url}>*'
+                                )
+                                await reportConfirm.add_reaction('✅')
+                            except discord.Forbidden:
+                                pass
+
+                        return successfulDM
+
+                successfulDM = True
+                await destination.send(embed=embed)
                 await db.update_one(
                     {'_id': thread['_id']},
                     {
@@ -770,20 +810,7 @@ class Mail(commands.Cog):
                 )
 
             else:
-                thread, successfulDM = await utils._trigger_create_user_thread(
-                    self.bot,
-                    message.author if not interaction else interaction.user,
-                    message,
-                    'message_report' if menu_interacted else 'user',
-                    interaction=interaction,
-                )
-
-                content, embed = self._format_message_embed(message, attachments, interaction=interaction)
-                msgContent = f'<@&{config.modRole}>'
-                if not successfulDM:
-                    msgContent += '\nPlease note, this user\'s DMs are closed. As such, they have been notified when they reported this message that they may not receive a moderator response.'
-
-                await thread.send(content=msgContent, embed=embed, silent=True)
+                await _create_discord_thread(self, message, interaction)
 
             if not interaction:
                 await message.add_reaction('✅')
@@ -798,34 +825,6 @@ class Mail(commands.Cog):
                     pass
 
             return successfulDM
-
-        elif message.channel.category_id == config.category:
-            doc = await db.find_one({'channel_id': str(message.channel.id)})
-            if doc:
-                if not ctx.valid:  # Not an invoked command, mark as internal message
-                    await db.update_one(
-                        {'_id': doc['_id']},
-                        {
-                            '$push': {
-                                'messages': {
-                                    'timestamp': str(message.created_at),
-                                    'message_id': str(message.id),
-                                    'content': message.content,
-                                    'type': 'internal',
-                                    'author': {
-                                        'id': str(message.author.id),
-                                        'name': message.author.name,
-                                        'discriminator': message.author.discriminator,
-                                        'avatar_url': str(
-                                            message.author.display_avatar.with_static_format('png').with_size(1024)
-                                        ),
-                                        'mod': True,
-                                    },
-                                    'attachments': attachments,
-                                }
-                            }
-                        },
-                    )
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         if ctx.command:
