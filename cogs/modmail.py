@@ -273,9 +273,21 @@ class Mail(commands.Cog):
 
         open_thread = await mclient.modmail.logs.find_one({'recipient.id': str(member.id), 'open': True})
         if open_thread:
-            return await interaction.followup.send(
-                f':x: Unable to open modmail to user -- there is already a thread involving them currently open in <#{open_thread["channel_id"]}>'
-            )
+            # Check thread channel exists
+            if not self.bot.get_channel(int(open_thread['channel_id'])):
+                # Thread channel not found in cache, attempt to API pull and recover
+                try:
+                    await self.bot.fetch_channel(int(open_thread['channel_id']))
+
+                except (discord.NotFound, discord.Forbidden) as e:
+                    # Channel is bad. Force thread closure and create anew
+                    logging.warning(f'Received {e} while checking thread {open_thread["channel_id"]}, recovering')
+                    await mclient.modmail.logs.update_one({'channel_id': open_thread['channel_id']}, {'$set': {'open': False}})
+
+                else:
+                    return await interaction.followup.send(
+                        f':x: Unable to open modmail to user -- there is already a thread involving them currently open in <#{open_thread["channel_id"]}>'
+                    )
 
         try:
             await utils._trigger_create_mod_thread(self.bot, interaction.guild, member, interaction.user)
@@ -560,7 +572,11 @@ class Mail(commands.Cog):
             db = mclient.modmail.logs
             doc = await db.find_one({'open': True, 'creator.id': str(user.id)})
             if doc:
-                await self.bot.get_channel(int(doc['channel_id'])).typing()
+                try:
+                    await self.bot.get_channel(int(doc['channel_id'])).typing()
+
+                except AttributeError:
+                    logging.error(f'Failed attempt to forward typing indicator to thread {doc["channel_id"]}, channel does not exist')
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, member):
@@ -798,9 +814,10 @@ class Mail(commands.Cog):
                     try:
                         destination = await self.bot.fetch_channel(int(thread['channel_id']))
 
-                    except (discord.NotFound, discord.Forbidden):
+                    except (discord.NotFound, discord.Forbidden) as e:
                         # Channel is bad. Force thread closure and create anew
-                        await db.update_one({'channel_id': thread['channel_id']}, {'$set': {'active': False}})
+                        logging.warning(f'Received {e} while adding reply to thread {thread["channel_id"]}, recovering')
+                        await db.update_one({'channel_id': thread['channel_id']}, {'$set': {'open': False}})
                         await _create_discord_thread(self, message, interaction)
                         if not interaction:
                             await message.add_reaction('✅')
