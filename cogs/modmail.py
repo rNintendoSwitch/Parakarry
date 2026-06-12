@@ -281,7 +281,9 @@ class Mail(commands.Cog):
                 except (discord.NotFound, discord.Forbidden) as e:
                     # Channel is bad. Force thread closure and create anew
                     logging.warning(f'Received {e} while checking thread {open_thread["channel_id"]}, recovering')
-                    await mclient.modmail.logs.update_one({'channel_id': open_thread['channel_id']}, {'$set': {'open': False}})
+                    await mclient.modmail.logs.update_one(
+                        {'channel_id': open_thread['channel_id']}, {'$set': {'open': False}}
+                    )
 
                 else:
                     return await interaction.followup.send(
@@ -575,7 +577,9 @@ class Mail(commands.Cog):
                     await self.bot.get_channel(int(doc['channel_id'])).typing()
 
                 except AttributeError:
-                    logging.error(f'Failed attempt to forward typing indicator to thread {doc["channel_id"]}, channel does not exist')
+                    logging.error(
+                        f'Failed attempt to forward typing indicator to thread {doc["channel_id"]}, channel does not exist'
+                    )
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild, member):
@@ -702,7 +706,10 @@ class Mail(commands.Cog):
             color=0xF381FD if interaction else 0x32B6CE,
         )
         if is_forward and message.cached_message:
-            embed.set_author(name=f'Forwarded message from {message.cached_message.author} ({message.cached_message.author.id})', icon_url=message.cached_message.author.display_avatar.url)
+            embed.set_author(
+                name=f'Forwarded message from {message.cached_message.author} ({message.cached_message.author.id})',
+                icon_url=message.cached_message.author.display_avatar.url,
+            )
             if interaction:
                 # Message reports shouldn't traverse through snapshots, jump only to the actual reported message
                 embed.url = _original_jump_url
@@ -719,7 +726,7 @@ class Mail(commands.Cog):
         if not interaction:
             if not is_forward:
                 embed.set_footer(text=f'{message.channel.id}/{message.id}')
-            
+
             elif is_forward and message.cached_message:
                 embed.set_footer(text=f'{message.cached_message.channel.id}/{message.cached_message.id}')
 

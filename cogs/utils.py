@@ -140,8 +140,8 @@ async def _can_appeal(member):
             pass
 
         if pun['expiry'] > datetime.now(tz=timezone.utc).timestamp():
-                await member.kick(reason='Not ready to appeal again')
-                return False
+            await member.kick(reason='Not ready to appeal again')
+            return False
 
     return True
 
