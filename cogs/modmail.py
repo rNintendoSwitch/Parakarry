@@ -216,31 +216,6 @@ class Mail(commands.Cog):
 
         else:
             await interaction.followup.send(embed=embed)
-        mailMsg = await interaction.original_response()
-
-        await db.update_one(
-            {'_id': doc['_id']},
-            {
-                '$push': {
-                    'messages': {
-                        'timestamp': str(datetime.now(tz=timezone.utc).isoformat(sep=' ')),
-                        'message_id': str(mailMsg.id),
-                        'content': content if content else '',
-                        'type': 'thread_message' if not anonymous else 'anonymous',
-                        'author': {
-                            'id': str(interaction.user.id),
-                            'name': interaction.user.name,
-                            'discriminator': interaction.user.discriminator,
-                            'avatar_url': str(
-                                interaction.user.display_avatar.with_static_format('png').with_size(1024)
-                            ),
-                            'mod': True,
-                        },
-                        'attachments': [replyMessage.attachments[0].url] if replyMessage.attachments else [],
-                    }
-                }
-            },
-        )
 
     @app_commands.command(name='open', description='Open a modmail thread with a user')
     @app_commands.describe(member='The user to start a thread with')
@@ -402,8 +377,7 @@ class Mail(commands.Cog):
                 None,
                 interaction.channel,
                 self.bot.get_channel(config.modLog),
-                dm=False,
-                reason='[Appeal accepted] ' + reason,
+                dm=False
             )
             try:
                 member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
@@ -535,8 +509,7 @@ class Mail(commands.Cog):
                 None,
                 interaction.channel,
                 self.bot.get_channel(config.modLog),
-                dm=False,
-                reason='[Appeal denied] ' + reason,
+                dm=False
             )
             try:
                 member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
@@ -841,29 +814,6 @@ class Mail(commands.Cog):
 
                 successfulDM = True
                 await destination.send(embed=embed)
-                await db.update_one(
-                    {'_id': thread['_id']},
-                    {
-                        '$push': {
-                            'messages': {
-                                'timestamp': str(message.created_at),
-                                'message_id': str(message.id),
-                                'content': content,
-                                'type': 'report' if interaction else 'thread_message',
-                                'author': {
-                                    'id': str(message.author.id),
-                                    'name': message.author.name,
-                                    'discriminator': message.author.discriminator,
-                                    'avatar_url': str(
-                                        message.author.display_avatar.with_static_format('png').with_size(1024)
-                                    ),
-                                    'mod': False,
-                                },
-                                'attachments': [x.url for x in message.stickers] + attachments,
-                            }
-                        }
-                    },
-                )
 
             else:
                 await _create_discord_thread(self, message, interaction)

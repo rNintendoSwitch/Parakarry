@@ -215,7 +215,7 @@ async def _create_thread(
                 'mod': False,
             },
             'closer': None,
-            'messages': [] if not initial_message else [initial_message],
+            'messages': [],
         }
     )
 
@@ -228,29 +228,11 @@ async def _close_thread(
     guild: discord.Guild,
     thread_channel: discord.TextChannel,
     target_channel: discord.TextChannel,
-    dm: bool = True,
-    reason: str = None,
+    dm: bool = True
 ):
     db = mclient.modmail.logs
     doc = await db.find_one({'channel_id': str(thread_channel.id)})
-
-    closeInfo = {
-        '$set': {
-            'open': False,
-            'closed_at': datetime.now(tz=timezone.utc).isoformat(sep=' '),
-            'closer': {
-                'id': str(mod_user.id),
-                'name': mod_user.name,
-                'discriminator': mod_user.discriminator,
-                'avatar_url': str(mod_user.display_avatar.with_static_format('png').with_size(1024)),
-                'mod': True,
-            },
-        }
-    }
-
-    if reason:
-        closeInfo['$set']['close_message'] = reason
-    await db.update_one({'_id': doc['_id']}, closeInfo)
+    await db.update_one({'_id': doc['_id']}, {'$set': {'open': False}})
 
     try:
         channel = bot.get_channel(thread_channel.id)
