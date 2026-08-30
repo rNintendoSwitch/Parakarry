@@ -199,8 +199,7 @@ class Mail(commands.Cog):
         else:
             embed.title = '[ANON] Moderator message'
             embed.set_author(
-                name=f'{interaction.user} ({interaction.user.id}) as r/NintendoSwitch',
-                icon_url='https://cdn.mattbsg.xyz/rns/snoo.png',
+                name=f'{interaction.user} ({interaction.user.id}) as r/NintendoSwitch'
             )
 
         if attachment and re.search(
