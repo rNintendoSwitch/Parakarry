@@ -198,9 +198,7 @@ class Mail(commands.Cog):
 
         else:
             embed.title = '[ANON] Moderator message'
-            embed.set_author(
-                name=f'{interaction.user} ({interaction.user.id}) as r/NintendoSwitch'
-            )
+            embed.set_author(name=f'{interaction.user} ({interaction.user.id}) as r/NintendoSwitch')
 
         if attachment and re.search(
             r'\.(gif|jpe?g|tiff|png|webp)(\?[a-zA-Z0-9#-_]*)?$', str(attachment), re.IGNORECASE
@@ -371,12 +369,7 @@ class Mail(commands.Cog):
 
         finally:
             await utils._close_thread(
-                self.bot,
-                interaction.user,
-                None,
-                interaction.channel,
-                self.bot.get_channel(config.modLog),
-                dm=False
+                self.bot, interaction.user, None, interaction.channel, self.bot.get_channel(config.modLog), dm=False
             )
             try:
                 member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)
@@ -503,12 +496,7 @@ class Mail(commands.Cog):
                 await interaction.followup.send(response_text)
 
             await utils._close_thread(
-                self.bot,
-                interaction.user,
-                None,
-                interaction.channel,
-                self.bot.get_channel(config.modLog),
-                dm=False
+                self.bot, interaction.user, None, interaction.channel, self.bot.get_channel(config.modLog), dm=False
             )
             try:
                 member = await self.bot.get_guild(config.appealGuild).fetch_member(user.id)

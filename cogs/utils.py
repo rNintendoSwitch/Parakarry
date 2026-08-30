@@ -228,7 +228,7 @@ async def _close_thread(
     guild: discord.Guild,
     thread_channel: discord.TextChannel,
     target_channel: discord.TextChannel,
-    dm: bool = True
+    dm: bool = True,
 ):
     db = mclient.modmail.logs
     doc = await db.find_one({'channel_id': str(thread_channel.id)})

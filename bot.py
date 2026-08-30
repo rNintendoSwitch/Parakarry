@@ -22,9 +22,7 @@ class Parakarry(commands.Bot):
             activity=discord.Activity(type=discord.ActivityType.playing, name='DM to contact mods'),
             case_insensitive=True,
             command_prefix=commands.when_mentioned,
-            intents=discord.Intents(
-                guilds=True, members=True, moderation=True, messages=True, dm_typing=True
-            ),
+            intents=discord.Intents(guilds=True, members=True, moderation=True, messages=True, dm_typing=True),
         )
         self.guildList = [config.guild]
         self.remove_command('help')
